@@ -39,8 +39,8 @@ namespace CloudStorages.DropBox
             try
             {
                 // 取得上次登入資訊
-                LastAccessToken = LoadAccessTokenDelegate();
-                LastRefreshToken = LoadRefreshTokenDelegate();
+                LastAccessToken = LoadAccessTokenDelegate?.Invoke();
+                LastRefreshToken = LoadRefreshTokenDelegate?.Invoke();
 
                 // 初始化
                 oAuthWrapper = new DropBoxOauthClient(ApiKey, RedirectUrl);
@@ -54,7 +54,7 @@ namespace CloudStorages.DropBox
                     else
                     {
                         // 儲存新的access token/refresh token
-                        SaveAccessTokenDelegate(oAuthWrapper.AccessToken);
+                        SaveAccessTokenDelegate?.Invoke(oAuthWrapper.AccessToken);
                         InitDriveService();
                     }
                 }
@@ -81,8 +81,8 @@ namespace CloudStorages.DropBox
             {
                 if (await oAuthWrapper.GetTokenAsync())
                 {
-                    SaveAccessTokenDelegate(oAuthWrapper.AccessToken);
-                    SaveRefreshTokenDelegate(oAuthWrapper.RefreshToken);
+                    SaveAccessTokenDelegate?.Invoke(oAuthWrapper.AccessToken);
+                    SaveRefreshTokenDelegate?.Invoke(oAuthWrapper.RefreshToken);
                     LastRefreshToken = oAuthWrapper.RefreshToken;
                     InitDriveService();
                     (result, accountInfo.userName, accountInfo.userEmail) = await GetUserInfoAsync();
