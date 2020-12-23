@@ -44,7 +44,7 @@ namespace CloudStorages.DropBox
 
                 // 初始化
                 oAuthWrapper = new DropBoxOauthClient(ApiKey, RedirectUrl);
-                if (!string.IsNullOrEmpty(LastRefreshToken))
+                if (!string.IsNullOrEmpty(LastRefreshToken))  // offline 類型的 token
                 {
                     IsNeedLogin = !await oAuthWrapper.RefreshTokenAsync(LastRefreshToken);
                     if (IsNeedLogin)
@@ -57,6 +57,11 @@ namespace CloudStorages.DropBox
                         SaveAccessTokenDelegate(oAuthWrapper.AccessToken);
                         InitDriveService();
                     }
+                }
+                else if (!string.IsNullOrEmpty(LastAccessToken))  // legacy 類型的 token，不需要refresh
+                {
+                    InitDriveService();
+                    IsNeedLogin = false;
                 }
                 result.Success = true;
             }
@@ -78,6 +83,7 @@ namespace CloudStorages.DropBox
                 {
                     SaveAccessTokenDelegate(oAuthWrapper.AccessToken);
                     SaveRefreshTokenDelegate(oAuthWrapper.RefreshToken);
+                    LastRefreshToken = oAuthWrapper.RefreshToken;
                     InitDriveService();
                     (result, accountInfo.userName, accountInfo.userEmail) = await GetUserInfoAsync();
                     if (result.Success)
@@ -110,7 +116,10 @@ namespace CloudStorages.DropBox
         private void InitDriveService()
         {
             dropboxClient?.Dispose();
-            dropboxClient = new DropboxClient(LastRefreshToken, ApiKey);
+            if (!string.IsNullOrEmpty(LastRefreshToken))
+                dropboxClient = new DropboxClient(LastRefreshToken, ApiKey);  // offline 類型的 token
+            else
+                dropboxClient = new DropboxClient(LastAccessToken);  // legacy 類型的 token
         }
 
         /// <summary>
