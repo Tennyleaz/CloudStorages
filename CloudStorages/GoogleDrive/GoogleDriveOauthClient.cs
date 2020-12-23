@@ -133,7 +133,50 @@ namespace CloudStorages.GoogleDrive
             return false;
         }
 
-        public Task<bool> RefreshTokenAsync(string refreshToken)
+        /// <summary>
+        /// 利用 refreshToken 更新 AccessToken 之後存到成員的 AccessToken
+        /// </summary>
+        public async Task<bool> RefreshTokenAsync(string refreshToken)
+        {
+            WebRequest request = WebRequest.Create(tokenRequestURI);
+            request.Method = "POST";
+            request.ContentType = "application/x-www-form-urlencoded";
+            //request.Headers.Add(HttpRequestHeader.AcceptLanguage, "application/json;charset=UTF-8");
+
+            // fill post request form data
+            string data = $"client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&refresh_token={refreshToken}&grant_type=refresh_token";
+            using (StreamWriter requestWriter = new StreamWriter(await request.GetRequestStreamAsync()))
+            {
+                requestWriter.Write(data, 0, data.Length);
+                requestWriter.Close();
+            }
+
+            try
+            {
+                using (WebResponse response = await request.GetResponseAsync())
+                {
+                    using (StreamReader streamReader = new StreamReader(response.GetResponseStream()))
+                    {
+                        string streamtoStr = await streamReader.ReadToEndAsync();
+                        Newtonsoft.Json.Linq.JObject jObject = Newtonsoft.Json.Linq.JObject.Parse(streamtoStr);
+                        string accessToken = jObject["access_token"]?.ToString();
+                        if (!string.IsNullOrEmpty(accessToken))
+                        {
+                            AccessToken = accessToken;
+                            RefreshToken = refreshToken;
+                            return true;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                //WSSystem.GetSystem().WriteLog("GoogleLoginInfo", WSBUtility.LOG_LEVEL.LL_SUB_FUNC, "RefreshToken() error: " + ex);
+            }
+            return false;
+        }
+
+        public Task<bool> RevokeTokenAsync(string accessToken)
         {
             throw new NotImplementedException();
         }

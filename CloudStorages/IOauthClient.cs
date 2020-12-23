@@ -11,6 +11,8 @@ namespace CloudStorages
 
         Task<bool> GetTokenAsync();
 
+        Task<bool> RevokeTokenAsync(string accessToken);
+
         string AccessToken { get; }
 
         string RefreshToken { get; }

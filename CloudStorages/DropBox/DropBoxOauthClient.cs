@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
@@ -10,7 +12,9 @@ namespace CloudStorages.DropBox
 {
     public class DropBoxOauthClient : IOauthClient
     {
+        private const int PKCEVerifierLength = 64;
         private const string TokenRefreshEndpoint = "https://api.dropbox.com/oauth2/token";
+        private const string TokenRevokeEndpoint = "https://api.dropboxapi.com/2/auth/token/revoke";
         // This loopback host is for demo purpose. If this port is not
         // available on your machine you need to update this URL with an unused port.
         private readonly string LoopbackHost;
@@ -40,6 +44,8 @@ namespace CloudStorages.DropBox
 
             // Generates state and PKCE values.
             string state = Guid.NewGuid().ToString("N");
+            string codeVerifier = GeneratePKCECodeVerifier();
+            string codeChallenge = GeneratePKCECodeChallenge(codeVerifier);
 
             try
             {
@@ -51,7 +57,7 @@ namespace CloudStorages.DropBox
                 listener.Start();
 
                 // Creates the OAuth 2.0 authorization request.
-                Uri authorizeUri = GetAuthorizeUri(apiKey, RedirectUri, state);
+                Uri authorizeUri = GetAuthorizeUri(apiKey, RedirectUri, state, codeChallenge: codeChallenge);
 
                 // Opens request in the browser.
                 System.Diagnostics.Process.Start(authorizeUri.ToString());
@@ -64,7 +70,9 @@ namespace CloudStorages.DropBox
                     //WSSystem.GetSystem().WriteLog("GoogleLoginInfo", WSBUtility.LOG_LEVEL.LL_TRACE_LOG, "Got listner context.");
 
                     // Sends an HTTP response to the browser.
-                    string responseString = "<html><head><meta http-equiv='refresh' content='10;url=https://www.dropbox.com'></head><body>"
+                    string responseString = "<html><head>" 
+                                            //+ "<meta http-equiv='refresh' content='10;url=https://www.dropbox.com'>"
+                                            + "</head><body>"
                                             + "Please close this tab."
                                             + "</body></html>";
                     var buffer = Encoding.UTF8.GetBytes(responseString);
@@ -112,7 +120,7 @@ namespace CloudStorages.DropBox
                 }
 
                 // Exchanging code for token
-                var tokenResult = await ProcessCodeFlowAsync(code, apiKey, RedirectUri.AbsoluteUri);
+                var tokenResult = await ProcessCodeFlowAsync(code, apiKey, redirectUri: RedirectUri.ToString(), codeVerifier: codeVerifier);
                 AccessToken = tokenResult.AccessToken;
                 RefreshToken = tokenResult.RefreshToken;
                 ExpiresAt = tokenResult.ExpiresAt;
@@ -186,6 +194,19 @@ namespace CloudStorages.DropBox
                 {
                     Console.WriteLine(ex);
                 }
+            }
+        }
+
+        public async Task<bool> RevokeTokenAsync(string accessToken)
+        {
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, TokenRevokeEndpoint);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            using (HttpClient client = new HttpClient())
+            {
+                HttpResponseMessage response = await client.SendAsync(request);
+                if (response.StatusCode == HttpStatusCode.OK)
+                    return true;
+                return false;
             }
         }
 
@@ -281,8 +302,7 @@ namespace CloudStorages.DropBox
             }
 
             //queryBuilder.Append("&token_access_type=").Append(tokenAccessType.ToString().ToLower());
-            queryBuilder.Append("&token_access_type=").Append("code");
-
+            queryBuilder.Append("&token_access_type=").Append("offline");
 
             if (scopeList != null)
             {
@@ -467,5 +487,28 @@ namespace CloudStorages.DropBox
             }
         }
         #endregion
+
+        private static string GeneratePKCECodeVerifier()
+        {
+            var bytes = new byte[PKCEVerifierLength];
+            RandomNumberGenerator.Create().GetBytes(bytes);
+            return Convert.ToBase64String(bytes)
+                .TrimEnd('=')
+                .Replace('+', '-')
+                .Replace('/', '_')
+                .Substring(0, PKCEVerifierLength);
+        }
+
+        private static string GeneratePKCECodeChallenge(string codeVerifier)
+        {
+            using (var sha256 = SHA256.Create())
+            {
+                var challengeBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(codeVerifier));
+                return Convert.ToBase64String(challengeBytes)
+                    .TrimEnd('=')
+                    .Replace('+', '-')
+                    .Replace('/', '_');
+            }
+        }
     }
 }
