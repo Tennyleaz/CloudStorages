@@ -12,4 +12,4 @@ An universal API client library for popular cloud storage providers.
 * Microsoft OneDrive (planning)
 
 ## Roadmap
-* Replacing all third party client libraries dependencies. (Bootstraping!)
+* Replacing all third party client libraries dependencies. (Bootstrapping!)
