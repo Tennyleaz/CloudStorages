@@ -38,6 +38,11 @@ namespace CloudStorages.DropBox
             RedirectUri = new Uri(LoopbackHost);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <exception cref="PortUnavailableException">Throws when given loopback url port is occupied.</exception>
+        /// <returns></returns>
         public async Task<bool> GetTokenAsync()
         {
             StopListen();
@@ -46,6 +51,11 @@ namespace CloudStorages.DropBox
             string state = Guid.NewGuid().ToString("N");
             string codeVerifier = GeneratePKCECodeVerifier();
             string codeChallenge = GeneratePKCECodeChallenge(codeVerifier);
+
+            // Test port is free, because dropbox oauth url need a fixed port assigned.
+            int port = RedirectUri.Port;
+            if (!IsPortAvailable(port))
+                throw new PortUnavailableException { RequiredPort = port };
 
             try
             {
@@ -509,6 +519,37 @@ namespace CloudStorages.DropBox
                     .Replace('+', '-')
                     .Replace('/', '_');
             }
+        }
+
+        // from: https://stackoverflow.com/a/51262610/3576052
+        private bool IsPortAvailable(int myPort)
+        {
+            var properties = System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties();
+
+            // Active connections
+            var connections = properties.GetActiveTcpConnections();
+            foreach (var c in connections)
+            {
+                if (myPort == c.LocalEndPoint.Port)
+                    return false;
+            }
+
+            // Active tcp listners
+            var endPointsTcp = properties.GetActiveTcpListeners();
+            foreach (var e in endPointsTcp)
+            {
+                if (myPort == e.Port)
+                    return false;
+            }
+
+            // Active udp listeners
+            var endPointsUdp = properties.GetActiveUdpListeners();
+            foreach (var e in endPointsUdp)
+            {
+                if (myPort == e.Port)
+                    return false;
+            }
+            return true;
         }
     }
 }

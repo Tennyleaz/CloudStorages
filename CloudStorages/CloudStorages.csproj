@@ -67,6 +67,7 @@
   <ItemGroup>
     <Compile Include="DropBox\DropBoxOauthClient.cs" />
     <Compile Include="DropBox\DropBoxStorage.cs" />
+    <Compile Include="Exceptions.cs" />
     <Compile Include="GoogleDrive\GoogleDriveOauthClient.cs" />
     <Compile Include="ICloudStorageClient.cs" />
     <Compile Include="IOauthClient.cs" />
