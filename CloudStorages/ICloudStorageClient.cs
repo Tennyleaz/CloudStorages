@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CloudStorages
@@ -18,6 +20,9 @@ namespace CloudStorages
 
         Action<string> SaveRefreshTokenDelegate { get; set; }
 
+        /// <summary>
+        /// Stop any possible HTTP listener for oauth client. Will also stop <c>LoginAsync()</c> flow.
+        /// </summary>
         void StopListen();
 
         /// <summary>
@@ -36,25 +41,42 @@ namespace CloudStorages
         /// </summary>
         Task<(CloudStorageResult result, CloudStorageAccountInfo info)> GetAccountInfoAsync();
 
-        string CreateFolder(string parentId, string folderName);
+        Task<(CloudStorageResult result, string folderId)> CreateFolderAsync(string parentId, string folderName);
 
-        string CreateFolder(string fullFolderPath);
+        /// <summary>
+        /// 從指定的完整路徑建立資料夾
+        /// </summary>
+        /// <param name="fullFolderPath"></param>
+        /// <returns>成功的話傳回新資料夾 Id</returns>
+        Task<(CloudStorageResult result, string folderId)> CreateFolderAsync(string fullFolderPath);
 
         string GetFolderId(string parentId, string folderName);
 
         string GetFolderId(string fullFolderPath);
 
-        CloudStorageFile GetFileInfo(string filePath);
+        /// <summary>
+        /// 取得單一檔案的資訊。
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <exception cref="FileNotFoundException">When filePath is not a file or not exist.</exception>
+        /// <returns></returns>
+        Task<CloudStorageFile> GetFileInfoAsync(string filePath);
 
-        IEnumerable<CloudStorageFile> GetFileInfosInPath(string filePath);
+        /// <summary>
+        /// 取得指定資料夾下單層檔案的資訊。
+        /// </summary>
+        /// <param name="folderPath"></param>
+        /// <exception cref="FileNotFoundException">When folderPath is not a folder or not exist.</exception>
+        /// <returns></returns>
+        Task <IEnumerable<CloudStorageFile>> GetFileInfosInPathAsync(string folderPath);
 
-        CloudStorageResult DownloadFileById(string fileID, string savePath);
+        Task <CloudStorageResult> DownloadFileByIdAsync(string fileID, string savePath, CancellationToken ct);
 
-        CloudStorageResult DownloadFileByPath(string filePath, string savePath);
+        Task<CloudStorageResult> DownloadFileByPathAsync(string filePath, string savePath, CancellationToken ct);
 
-        CloudStorageResult UploadFileToFolderById(string filePath, string folderId = null);
+        Task<CloudStorageResult> UploadFileToFolderByIdAsync(string filePath, CancellationToken ct, string folderId = null);
 
-        CloudStorageResult UploadFileToFolderByPath(string filePath, string folderName = null);
+        Task<CloudStorageResult> UploadFileToFolderByPathAsync(string filePath, CancellationToken ct, string folderName = null);
 
         Task<CloudStorageResult> DeleteFileByIdAsync(string fileID);
 
