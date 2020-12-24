@@ -5,6 +5,7 @@ namespace CloudStorages
     public struct CloudStorageResult
     {
         public bool Success;
+        public bool Cancelled;
         public string Message;
     }
 
