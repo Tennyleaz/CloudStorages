@@ -341,3 +341,5 @@ healthchecksdb
 dbaccess.txt
 dbkey.txt
 dbrefresh.txt
+gdkey.txt
+gdsecret.txt

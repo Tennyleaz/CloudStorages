@@ -69,6 +69,7 @@
     <Compile Include="DropBox\DropBoxStorage.cs" />
     <Compile Include="Exceptions.cs" />
     <Compile Include="GoogleDrive\GoogleDriveOauthClient.cs" />
+    <Compile Include="GoogleDrive\GoogleDriveStorage.cs" />
     <Compile Include="ICloudStorageClient.cs" />
     <Compile Include="IOauthClient.cs" />
     <Compile Include="Models.cs" />

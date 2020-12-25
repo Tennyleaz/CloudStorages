@@ -16,6 +16,7 @@ namespace CloudStorages.GoogleDrive
         private const string code_challenge_method = "S256";
         private const string authorizationEndpoint = "https://accounts.google.com/o/oauth2/v2/auth";
         private const string tokenRequestURI = "https://oauth2.googleapis.com/token";
+        private const string tokenRevikeUrl = "https://oauth2.googleapis.com/revoke?token=";
         private HttpListener listener;
         private readonly string CLIENT_ID, CLIENT_SECRET;
 
@@ -176,9 +177,15 @@ namespace CloudStorages.GoogleDrive
             return false;
         }
 
-        public Task<bool> RevokeTokenAsync(string accessToken)
+        public async Task<bool> RevokeTokenAsync(string accessToken)
         {
-            throw new NotImplementedException();
+            HttpWebRequest request = (HttpWebRequest) WebRequest.Create(tokenRevikeUrl);
+            using (HttpWebResponse response = (HttpWebResponse) await request.GetResponseAsync())
+            {
+                if (response.StatusCode == HttpStatusCode.OK)
+                    return true;
+                return false;
+            }
         }
 
         public void StopListen()
