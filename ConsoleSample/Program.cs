@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CloudStorages;
 using CloudStorages.DropBox;
+using CloudStorages.GoogleDrive;
 
 namespace ConsoleSample
 {
@@ -16,7 +17,50 @@ namespace ConsoleSample
         {
             try
             {
-                Task.Run(Test).Wait();
+                // create dropbox client
+                string apiKey;
+                string redirectUrl = @"http://localhost:51001/";
+                try
+                {
+                    apiKey = File.ReadAllText(@"D:\Test Dir\CloudStorages\dbkey.txt");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Cannot read api key: " + ex.Message);
+                    throw ex;
+                }
+
+                ICloudStorageClient dropBoxClient = new DropBoxStorage(apiKey, redirectUrl);
+                dropBoxClient.SaveAccessTokenDelegate = SaveAccessToken;
+                dropBoxClient.SaveRefreshTokenDelegate = SaveRefreshToken;
+                dropBoxClient.LoadAccessTokenDelegate = LoadAccessToken;
+                dropBoxClient.LoadRefreshTokenDelegate = LoadRefresToken;
+
+                Task.Run(() => Test(dropBoxClient)).Wait();
+                Console.Write("Finish testing dropbox.\n\n");
+
+                // create google drive client
+                string appName = "Test App";
+                string apiSecret;
+                try
+                {
+                    apiKey = File.ReadAllText(@"D:\Test Dir\CloudStorages\gdkey.txt");
+                    apiSecret = File.ReadAllText(@"D:\Test Dir\CloudStorages\gdsecret.txt");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Cannot read api key/secret: " + ex.Message);
+                    throw ex;
+                }
+
+                ICloudStorageClient googleClient = new GoogleDriveStorage(apiKey, apiSecret, appName);
+                //googleClient.SaveAccessTokenDelegate = SaveAccessToken;
+                //googleClient.SaveRefreshTokenDelegate = SaveRefreshToken;
+                //googleClient.LoadAccessTokenDelegate = LoadAccessToken;
+                //googleClient.LoadRefreshTokenDelegate = LoadRefresToken;
+
+                Task.Run(() => Test(googleClient)).Wait();
+                Console.Write("Finish testing google drive.\n\n");
             }
             catch (Exception e)
             {
@@ -27,28 +71,9 @@ namespace ConsoleSample
             Console.ReadKey();
         }
 
-        private static async Task Test()
+        private static async Task Test(ICloudStorageClient client)
         {
-            string apiKey;
-            string redirectUrl = @"http://localhost:51001/";
-            try
-            {
-                apiKey = File.ReadAllText(@"D:\Test Dir\CloudStorages\dbkey.txt");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Cannot read api key: " + ex.Message);
-                return;
-            }
-
-            ICloudStorageClient dropboxClent = new DropBoxStorage(apiKey, redirectUrl);
-            dropboxClent.SaveAccessTokenDelegate = SaveAccessToken;
-            dropboxClent.SaveRefreshTokenDelegate = SaveRefreshToken;
-            dropboxClent.LoadAccessTokenDelegate = LoadAccessToken;
-            dropboxClent.LoadRefreshTokenDelegate = LoadRefresToken;
-            
-            var (result, isNeedLogin) = await dropboxClent.InitAsync();
-            dropboxClent.StopListen();
+            var (result, isNeedLogin) = await client.InitAsync();
             if (!result.Success)
             {
                 Console.WriteLine("Initial failed, reason=" + result.Message);
@@ -59,9 +84,12 @@ namespace ConsoleSample
 
             CloudStorageAccountInfo accountInfo;
             if (isNeedLogin)
-                (result, accountInfo) = await dropboxClent.LoginAsync();
+            {
+                (result, accountInfo) = await client.LoginAsync();
+                client.StopListen();
+            }
             else
-                (result, accountInfo) = await dropboxClent.GetAccountInfoAsync();
+                (result, accountInfo) = await client.GetAccountInfoAsync();
 
             if (!result.Success)
             {
@@ -74,7 +102,7 @@ namespace ConsoleSample
             Console.WriteLine(string.Format(formatter, "Account space: {0:fs} / {1:fs}", accountInfo.usedSpace, accountInfo.totalSpace));
 
             string folderId, folderName = "/test/folder1";
-            (result, folderId) = await dropboxClent.CreateFolderAsync(folderName);
+            (result, folderId) = await client.CreateFolderAsync(folderName);
             if (!result.Success)
             {
                 Console.WriteLine("Create folder failed, reason=" + result.Message);
@@ -85,7 +113,7 @@ namespace ConsoleSample
             string localFile = "test.txt";
             File.WriteAllText(localFile, "I am a test file.");
             CancellationTokenSource cts = new CancellationTokenSource();
-            result = await dropboxClent.UploadFileToFolderByPathAsync(localFile, cts.Token, folderName);
+            result = await client.UploadFileToFolderByPathAsync(localFile, cts.Token, folderName);
             if (!result.Success)
             {
                 Console.WriteLine("Upload file failed, reason=" + result.Message);
@@ -95,7 +123,7 @@ namespace ConsoleSample
             File.Delete(localFile);
 
             string cloudFile = folderName + "/" + localFile;
-            result = await dropboxClent.DownloadFileByPathAsync(cloudFile, localFile, cts.Token);
+            result = await client.DownloadFileByPathAsync(cloudFile, localFile, cts.Token);
             if (!result.Success)
             {
                 Console.WriteLine("Download file failed, reason=" + result.Message);
@@ -103,7 +131,7 @@ namespace ConsoleSample
             }
             Console.WriteLine($"Downloaded file {localFile}");
 
-            result = await dropboxClent.DeleteFileByPathAsync(cloudFile);
+            result = await client.DeleteFileByPathAsync(cloudFile);
             if (!result.Success)
             {
                 Console.WriteLine("Delete file failed, reason=" + result.Message);
