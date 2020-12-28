@@ -255,6 +255,8 @@ namespace CloudStorages.GoogleDrive
                         (result, accountInfo.usedSpace, accountInfo.totalSpace) = await GetRootInfoAsync();
                     }
                 }
+                else
+                    result.Message = oauthClient.LastError;
             }
             catch (Exception ex)
             {
