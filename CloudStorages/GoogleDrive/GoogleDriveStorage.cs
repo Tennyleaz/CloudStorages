@@ -35,9 +35,20 @@ namespace CloudStorages.GoogleDrive
             ApiSecret = apiSecret;
         }
 
-        public Task<(CloudStorageResult result, string folderId)> CreateFolderAsync(string parentId, string folderName)
+        public async Task<(CloudStorageResult result, string folderId)> CreateFolderAsync(string parentId, string folderName)
         {
-            throw new NotImplementedException();
+            CloudStorageResult result = new CloudStorageResult();
+            string folderId = null;
+            try
+            {
+                folderId = await TryCreateFolder(parentId, folderName);
+                result.Success = true;
+            }
+            catch (Exception ex)
+            {
+                result.Message = ex.Message;
+            }
+            return (result, folderId);
         }
 
         public async Task<(CloudStorageResult result, string folderId)> CreateFolderAsync(string fullFolderPath)
@@ -69,6 +80,12 @@ namespace CloudStorages.GoogleDrive
             return (result, folderId);
         }
 
+        /// <summary>
+        /// 先檢查 parentId 下是否有同名資料夾，沒有再建立新資料夾。
+        /// </summary>
+        /// <param name="parentId"></param>
+        /// <param name="folderName"></param>
+        /// <returns>回傳現有或是新建立的資料夾 ID</returns>
         private async Task<string> TryCreateFolder(string parentId, string folderName)
         {
             string folderId = await FindFolderId(parentId, folderName);

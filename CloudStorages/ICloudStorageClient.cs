@@ -21,7 +21,7 @@ namespace CloudStorages
         Action<string> SaveRefreshTokenDelegate { get; set; }
 
         /// <summary>
-        /// Stop any possible HTTP listener for oauth client. Will also stop <c>LoginAsync()</c> flow.
+        /// Stop any possible HTTP listener for oauth client. Will also stop <see cref="LoginAsync"/> flow.
         /// </summary>
         void StopListen();
 
