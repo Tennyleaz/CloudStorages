@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -36,6 +37,45 @@ namespace CloudStorages.DropBox
             this.apiKey = apiKey;
             LoopbackHost = redirectUrl;
             RedirectUri = new Uri(LoopbackHost);
+        }
+
+        public string GetTokenToUri()
+        {
+            StopListen();
+
+            string state = Guid.NewGuid().ToString("N");
+
+            // Creates the OAuth 2.0 authorization request.
+            Uri authorizeUri = GetAuthorizeUri(apiKey, RedirectUri, state, oauthResponseType: OAuthResponseType.Token, tokenAccessType: TokenAccessType.Null);
+
+            // Opens request in the browser.
+            System.Diagnostics.Process.Start(authorizeUri.ToString());
+            return state;
+        }
+
+        public bool ProcessUri(string state, string uri)
+        {
+            NameValueCollection collection = System.Web.HttpUtility.ParseQueryString(uri);
+            // extracts the code
+            string accessToken = collection.Get("access_token");
+            string incoming_state = collection.Get("state");
+            if (accessToken == null || incoming_state == null)
+            {
+                //WSSystem.GetSystem().WriteLog("GoogleLoginInfo", WSBUtility.LOG_LEVEL.LL_SUB_FUNC, "Oauth request does not give code!");
+                return false;
+            }
+            // check state
+            if (!string.Equals(incoming_state, state))
+            {
+                return false;
+            }
+
+            // Exchanging code for token
+            AccessToken = accessToken;
+            RefreshToken = null;
+            ExpiresAt = null;
+            
+            return true;
         }
 
         /// <summary>
@@ -251,8 +291,11 @@ namespace CloudStorages.DropBox
         /// different account.</param>
         /// <param name="scopeList">list of scopes to request in base oauth flow.  If left blank, will default to all scopes for app</param>
         /// <param name="codeChallenge">If using PKCE, please us the PKCEOAuthFlow object</param>
+        /// <param name="oauthResponseType"> </param>
+        /// <param name="tokenAccessType"> Could be null, offline (short-lived access_token and a long-lived refresh_token), online (short-lived access_token)</param>
         /// <returns>The uri of a web page which must be displayed to the user in order to authorize the app.</returns>
-        private static Uri GetAuthorizeUri(string clientId, Uri redirectUri, string state = null, bool forceReapprove = false, bool disableSignup = false, string requireRole = null, bool forceReauthentication = false, string[] scopeList = null, string codeChallenge = null)
+        private static Uri GetAuthorizeUri(string clientId, Uri redirectUri, string state = null, bool forceReapprove = false, bool disableSignup = false, 
+            string requireRole = null, bool forceReauthentication = false, string[] scopeList = null, string codeChallenge = null, OAuthResponseType oauthResponseType = OAuthResponseType.Code, TokenAccessType tokenAccessType = TokenAccessType.Null)
         {
             if (string.IsNullOrWhiteSpace(clientId))
             {
@@ -267,17 +310,16 @@ namespace CloudStorages.DropBox
             var queryBuilder = new StringBuilder();
 
             queryBuilder.Append("response_type=");
-            //switch (oauthResponseType)
-            //{
-            //    case OAuthResponseType.Token:
-            //        queryBuilder.Append("token");
-            //        break;
-            //    case OAuthResponseType.Code:
+            switch (oauthResponseType)
+            {
+                case OAuthResponseType.Token:
+                    queryBuilder.Append("token");
+                    break;
+                default:
+                case OAuthResponseType.Code:
                     queryBuilder.Append("code");
-            //        break;
-            //    default:
-            //        throw new ArgumentOutOfRangeException("oauthResponseType");
-            //}
+                    break;
+            }
 
             queryBuilder.Append("&client_id=").Append(Uri.EscapeDataString(clientId));
 
@@ -311,8 +353,9 @@ namespace CloudStorages.DropBox
                 queryBuilder.Append("&force_reauthentication=true");
             }
 
-            //queryBuilder.Append("&token_access_type=").Append(tokenAccessType.ToString().ToLower());
-            queryBuilder.Append("&token_access_type=").Append("offline");
+            if (tokenAccessType != TokenAccessType.Null)
+                queryBuilder.Append("&token_access_type=").Append(tokenAccessType.ToString().ToLower());
+            //queryBuilder.Append("&token_access_type=").Append("offline");
 
             if (scopeList != null)
             {
@@ -448,7 +491,7 @@ namespace CloudStorages.DropBox
             }
         }
 
-        private class OAuth2Response
+        public class OAuth2Response
         {
             public string AccessToken { get; private set; }
 
@@ -550,6 +593,33 @@ namespace CloudStorages.DropBox
                     return false;
             }
             return true;
+        }
+
+        private enum OAuthResponseType
+        {
+            Code,
+            /// <summary>
+            /// Legacy. We recommend the PKCE flow.
+            /// </summary>
+            Token
+        }
+
+        private enum TokenAccessType
+        {
+            /// <summary>
+            /// If omitted, the response will default to returning a long-lived access_token if they are allowed in the app console.
+            /// If long-lived access tokens are disabled in the app console, this parameter defaults to online.
+            /// </summary>
+            Null,
+            /// <summary>
+            /// Contain a short-lived access_token and a long-lived refresh_token that can be used to request a new short-lived access token
+            /// as long as a user's approval remains valid.
+            /// </summary>
+            Offline,
+            /// <summary>
+            /// Only a short-lived access_token will be returned.
+            /// </summary>
+            Online
         }
     }
 }

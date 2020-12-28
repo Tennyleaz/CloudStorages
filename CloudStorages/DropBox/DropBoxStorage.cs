@@ -9,7 +9,7 @@ using Dropbox.Api.Files;
 
 namespace CloudStorages.DropBox
 {
-    public class DropBoxStorage : ICloudStorageClient
+    public class DropBoxStorage : ICloudStorageClient, IUriHandler
     {
         //private const string DateTimeFormat = "yyyy-MM-dd HHmmss";
         private const int CHUNK_SIZE = 1024 * 100;  // default size is 100kb
@@ -105,8 +105,8 @@ namespace CloudStorages.DropBox
         {
             CloudStorageResult result = new CloudStorageResult();
             CloudStorageAccountInfo info = new CloudStorageAccountInfo();
-            if (string.IsNullOrEmpty(LastRefreshToken))
-                return (result, info);
+            //if (string.IsNullOrEmpty(LastRefreshToken))
+            //    return (result, info);
 
             (result, info.userName, info.userEmail) = await GetUserInfoAsync();
             if (result.Success)
@@ -540,6 +540,36 @@ namespace CloudStorages.DropBox
         {
             var args = new CloudStorageProgressArgs { BytesSent = bytesSent };
             ProgressChanged?.Invoke(null, args);
+        }
+
+        public CloudStorageResult AuthenticateFromUri(string state, string uri)
+        {
+            CloudStorageResult result = new CloudStorageResult();
+            try
+            {
+                result.Success = oAuthWrapper.ProcessUri(state, uri);
+                if (result.Success)
+                {
+                    LastAccessToken = oAuthWrapper.AccessToken;
+                    LastRefreshToken = oAuthWrapper.RefreshToken;
+                    SaveAccessTokenDelegate?.Invoke(LastAccessToken);
+                    SaveRefreshTokenDelegate?.Invoke(LastRefreshToken);
+                    InitDriveService();
+                }
+            }
+            catch (Exception e)
+            {
+                result.Message = e.Message;
+            }
+            return result;
+        }
+
+        public string LoginToUri()
+        {
+            StopListen();
+            oAuthWrapper = new DropBoxOauthClient(ApiKey, RedirectUrl);
+            string state = oAuthWrapper.GetTokenToUri();
+            return state;
         }
     }
 }
