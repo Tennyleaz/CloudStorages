@@ -43,43 +43,34 @@ namespace CloudStorages
 
         Task<(CloudStorageResult result, string folderId)> CreateFolderAsync(string parentId, string folderName);
 
-        /// <summary>
-        /// 從指定的完整路徑建立資料夾
-        /// </summary>
-        /// <param name="fullFolderPath"></param>
-        /// <returns>成功的話傳回新資料夾 Id</returns>
-        Task<(CloudStorageResult result, string folderId)> CreateFolderAsync(string fullFolderPath);
-
-        string GetFolderId(string parentId, string folderName);
-
-        string GetFolderId(string fullFolderPath);
+        Task<string> GetRootFolderIdAsync();
 
         /// <summary>
-        /// 取得單一檔案的資訊。
+        /// 在指定資料夾下搜尋子資料夾名稱
         /// </summary>
-        /// <param name="filePath"></param>
-        /// <exception cref="FileNotFoundException">When filePath is not a file or not exist.</exception>
+        /// <param name="parentId"></param>
+        /// <param name="folderName"></param>
         /// <returns></returns>
-        Task<CloudStorageFile> GetFileInfoAsync(string filePath);
+        Task<string> GetFolderIdAsync(string parentId, string folderName);
 
         /// <summary>
-        /// 取得指定資料夾下單層檔案的資訊。
+        /// 取得單一檔案Id的資訊。
         /// </summary>
-        /// <param name="folderPath"></param>
-        /// <exception cref="FileNotFoundException">When folderPath is not a folder or not exist.</exception>
+        /// <exception cref="FileNotFoundException">When fileId is not a file or not exist.</exception>
         /// <returns></returns>
-        Task <IEnumerable<CloudStorageFile>> GetFileInfosInPathAsync(string folderPath);
+        Task<CloudStorageFile> GetFileInfoAsync(string fileId);
+
+        /// <summary>
+        /// 取得指定資料夾Id下單層檔案的資訊。
+        /// </summary>
+        /// <exception cref="FileNotFoundException">When folderId is not a folder or not exist.</exception>
+        /// <returns></returns>
+        Task<IEnumerable<CloudStorageFile>> GetFileInfosInPathAsync(string folderId);
 
         Task <CloudStorageResult> DownloadFileByIdAsync(string fileID, string savePath, CancellationToken ct);
 
-        Task<CloudStorageResult> DownloadFileByPathAsync(string filePath, string savePath, CancellationToken ct);
-
-        Task<CloudStorageResult> UploadFileToFolderByIdAsync(string filePath, CancellationToken ct, string folderId = null);
-
-        Task<CloudStorageResult> UploadFileToFolderByPathAsync(string filePath, CancellationToken ct, string folderName = null);
+        Task<(CloudStorageResult, CloudStorageFile)> UploadFileToFolderByIdAsync(string filePath, string folderId, CancellationToken ct);
 
         Task<CloudStorageResult> DeleteFileByIdAsync(string fileID);
-
-        Task<CloudStorageResult> DeleteFileByPathAsync(string filePath);
     }
 }

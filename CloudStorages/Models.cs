@@ -14,7 +14,7 @@ namespace CloudStorages
         public long totalSpace, usedSpace;
     }
 
-    public struct CloudStorageFile
+    public class CloudStorageFile
     {
         public long Size;
         public string Name;
