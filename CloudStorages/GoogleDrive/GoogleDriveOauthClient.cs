@@ -11,14 +11,15 @@ namespace CloudStorages.GoogleDrive
 {
     public class GoogleDriveOauthClient : IOauthClient
     {
-        private const string SCOPE = "https://www.google.com/m8/feeds https://picasaweb.google.com/data/  https://www.googleapis.com/auth/userinfo.email " +
-                                     "https://www.googleapis.com/auth/drive profile"; //增加google drive 使用權 by joshua 20170224
+        private const string SCOPE = "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive profile";
         private const string code_challenge_method = "S256";
         private const string authorizationEndpoint = "https://accounts.google.com/o/oauth2/v2/auth";
         private const string tokenRequestURI = "https://oauth2.googleapis.com/token";
         private const string tokenRevikeUrl = "https://oauth2.googleapis.com/revoke?token=";
         private HttpListener listener;
         private readonly string CLIENT_ID, CLIENT_SECRET;
+
+        public string LastError { get; private set; }
 
         public string AccessToken { get; private set; }
 
@@ -102,8 +103,7 @@ namespace CloudStorages.GoogleDrive
                 // Checks for errors.
                 if (context.Request.QueryString.Get("error") != null)
                 {
-                    string log = "Oauth reques error: " + context.Request.QueryString.Get("error");
-                    //WSSystem.GetSystem().WriteLog("GoogleLoginInfo", WSBUtility.LOG_LEVEL.LL_SERIOUS_ERROR, log);
+                    LastError = context.Request.QueryString.Get("error");
                     return false;
                 }
                 // extracts the code
@@ -129,7 +129,7 @@ namespace CloudStorages.GoogleDrive
             }
             catch (Exception ex)
             {
-                
+                LastError = ex.Message;
             }
             return false;
         }
@@ -172,7 +172,7 @@ namespace CloudStorages.GoogleDrive
             }
             catch (Exception ex)
             {
-                //WSSystem.GetSystem().WriteLog("GoogleLoginInfo", WSBUtility.LOG_LEVEL.LL_SUB_FUNC, "RefreshToken() error: " + ex);
+                LastError = ex.Message;
             }
             return false;
         }
@@ -244,9 +244,7 @@ namespace CloudStorages.GoogleDrive
                     if (tokenEndpointDecoded.ContainsKey("access_token"))
                         access_token = tokenEndpointDecoded["access_token"];
                     if (tokenEndpointDecoded.ContainsKey("refresh_token"))
-                        refresh_token = tokenEndpointDecoded["refresh_token"];
-                    //if (access_token == null || refresh_token == null)
-                    //    WSSystem.GetSystem().WriteLog("GoogleLoginInfo", WSBUtility.LOG_LEVEL.LL_SUB_FUNC, "PerformCodeExchangeAsync error respnse: " + responseText);
+                        refresh_token = tokenEndpointDecoded["refresh_token"];                    
                     return (access_token, refresh_token);
                 }
             }
@@ -260,16 +258,15 @@ namespace CloudStorages.GoogleDrive
                         {
                             // reads response body
                             string responseText = await reader.ReadToEndAsync();
-                            //WSSystem.GetSystem().WriteLog("GoogleLoginInfo", WSBUtility.LOG_LEVEL.LL_SUB_FUNC, "PerformCodeExchangeAsync WebException: " + responseText);
+                            LastError = responseText;
                             return (null, null);
                         }
                     }
-                }
-                
+                }                
             }
             catch (Exception ex)
             {
-                
+                LastError = ex.Message;
             }
             return (null, null);
         }
