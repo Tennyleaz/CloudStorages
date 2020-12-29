@@ -32,7 +32,7 @@ namespace CloudStorages.DropBox
             RedirectUrl = redirectUrl;
         }
 
-        public async Task<(CloudStorageResult result, bool IsNeedLogin)> InitAsync()
+        public async Task<CloudStorageResult> InitAsync()
         {
             CloudStorageResult result = new CloudStorageResult();
             bool IsNeedLogin = true;
@@ -50,10 +50,12 @@ namespace CloudStorages.DropBox
                     IsNeedLogin = !await oAuthWrapper.RefreshTokenAsync(LastRefreshToken);
                     if (IsNeedLogin)
                     {
+                        result.Status = Status.NeedAuthenticate;
                         LastAccessToken = LastRefreshToken = null;
                     }
                     else
                     {
+                        result.Status = Status.Success;
                         // 儲存新的access token/refresh token
                         SaveAccessTokenDelegate?.Invoke(oAuthWrapper.AccessToken);
                         InitDriveService();
@@ -61,17 +63,16 @@ namespace CloudStorages.DropBox
                 }
                 else if (!string.IsNullOrEmpty(LastAccessToken))  // legacy 類型的 token，不需要refresh
                 {
+                    result.Status = Status.Success;
                     InitDriveService();
-                    IsNeedLogin = false;
                 }
-                result.Success = true;
             }
             catch (Exception ex)
             {
-                result.Success = false;
+                result.Status = Status.UnknownError;
                 result.Message = ex.Message;
             }
-            return (result, IsNeedLogin);
+            return result;
         }
 
         public async Task<(CloudStorageResult, CloudStorageAccountInfo)> LoginAsync()
@@ -87,7 +88,7 @@ namespace CloudStorages.DropBox
                     LastRefreshToken = oAuthWrapper.RefreshToken;
                     InitDriveService();
                     (result, accountInfo.userName, accountInfo.userEmail) = await GetUserInfoAsync();
-                    if (result.Success)
+                    if (result.Status == Status.Success)
                     {
                         (result, accountInfo.usedSpace, accountInfo.totalSpace) = await GetRootInfoAsync();
                     }
@@ -95,7 +96,7 @@ namespace CloudStorages.DropBox
             }
             catch (Exception ex)
             {
-                result.Success = false;
+                result.Status = Status.UnknownError;
                 result.Message = ex.Message;
             }
             return (result, accountInfo);
@@ -109,7 +110,7 @@ namespace CloudStorages.DropBox
             //    return (result, info);
 
             (result, info.userName, info.userEmail) = await GetUserInfoAsync();
-            if (result.Success)
+            if (result.Status == Status.Success)
                 (result, info.usedSpace, info.totalSpace) = await GetRootInfoAsync();
             return (result, info);
         }
@@ -135,11 +136,10 @@ namespace CloudStorages.DropBox
                 var usage = await dropboxClient.Users.GetSpaceUsageAsync();
                 totalSpace = (long)usage.Allocation.AsIndividual.Value.Allocated;
                 usedSpace = (long)usage.Used;
-                result.Success = true;
+                result.Status = Status.Success;
             }
             catch (Exception ex)
             {
-                result.Success = false;
                 result.Message = ex.Message;
             }
             return (result, usedSpace, totalSpace);
@@ -157,11 +157,10 @@ namespace CloudStorages.DropBox
                 var fullAccount = await dropboxClient.Users.GetCurrentAccountAsync();
                 userName = fullAccount.Name.DisplayName;
                 userEmail = fullAccount.Email;
-                result.Success = true;
+                result.Status = Status.Success;
             }
             catch (Exception ex)
             {
-                result.Success = false;
                 result.Message = ex.Message;
             }
             return (result, userName, userEmail);
@@ -190,13 +189,13 @@ namespace CloudStorages.DropBox
                 folderId = await TryGetFolderIdAsync(fullFolderPath);
                 if (!string.IsNullOrEmpty(folderId))
                 {
-                    result.Success = true;
+                    result.Status = Status.Success;
                     return (result, folderId);
                 }
 
                 var createResult = await dropboxClient.Files.CreateFolderV2Async(fullFolderPath);
                 folderId = createResult.Metadata.Id;
-                result.Success = true;
+                result.Status = Status.Success;
             }
             catch (Exception ex)
             {
@@ -231,7 +230,7 @@ namespace CloudStorages.DropBox
                 fileID = fileID.Replace("id:", string.Empty);  // 要刪除前綴 "id:" 才是 dropbox 正確格式
                 List<string> deletedIds = new List<string> { fileID };
                 var deleteResult = await dropboxClient.FileRequests.DeleteAsync(deletedIds);
-                result.Success = true;
+                result.Status = Status.Success;
             }
             catch (ApiException<Dropbox.Api.FileRequests.DeleteFileRequestError> ex)
             {
@@ -250,7 +249,7 @@ namespace CloudStorages.DropBox
             try
             {
                 var deleteResult = await dropboxClient.Files.DeleteV2Async(filePath);
-                result.Success = true;
+                result.Status = Status.Success;
             }
             catch (Exception ex)
             {
@@ -296,11 +295,11 @@ namespace CloudStorages.DropBox
                     await fileStream.FlushAsync(ct);
                     fileStream.Close();
                 }
-                result.Success = true;
+                result.Status = Status.Success;
             }
             catch (TaskCanceledException ex)
             {
-                result.Cancelled = true;
+                result.Status = Status.Cancelled;
                 result.Message = ex.Message;
             }
             catch (Exception ex)
@@ -420,11 +419,11 @@ namespace CloudStorages.DropBox
                 {
                     await UploadBigFile(filePath, folderName, ct);
                 }
-                result.Success = true;
+                result.Status = Status.Success;
             }
             catch (TaskCanceledException ex)
             {
-                result.Cancelled = true;
+                result.Status = Status.Cancelled;
                 result.Message = ex.Message;
             }
             catch (Exception ex)
@@ -547,15 +546,17 @@ namespace CloudStorages.DropBox
             CloudStorageResult result = new CloudStorageResult();
             try
             {
-                result.Success = oAuthWrapper.ProcessUri(state, uri);
-                if (result.Success)
+                bool success = oAuthWrapper.ProcessUri(state, uri);
+                if (success)
                 {
+                    result.Status = Status.Success;
                     LastAccessToken = oAuthWrapper.AccessToken;
                     LastRefreshToken = oAuthWrapper.RefreshToken;
                     SaveAccessTokenDelegate?.Invoke(LastAccessToken);
                     SaveRefreshTokenDelegate?.Invoke(LastRefreshToken);
                     InitDriveService();
                 }
+                result.Status = Status.NeedAuthenticate;
             }
             catch (Exception e)
             {

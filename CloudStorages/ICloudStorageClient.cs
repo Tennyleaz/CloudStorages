@@ -29,7 +29,7 @@ namespace CloudStorages
         /// 初始化元件，並檢查有沒有舊的登入Token，有的話嘗試refresh token一次
         /// </summary>
         /// <returns>成員成功初始化就會回傳Success</returns>
-        Task<(CloudStorageResult result, bool IsNeedLogin)> InitAsync();
+        Task<CloudStorageResult> InitAsync();
 
         /// <summary>
         /// 登入並取得帳號和容量資訊

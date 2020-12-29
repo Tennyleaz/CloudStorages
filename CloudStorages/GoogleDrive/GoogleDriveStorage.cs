@@ -42,7 +42,7 @@ namespace CloudStorages.GoogleDrive
             try
             {
                 folderId = await TryCreateFolder(parentId, folderName);
-                result.Success = true;
+                result.Status = Status.Success;
             }
             catch (Exception ex)
             {
@@ -71,7 +71,7 @@ namespace CloudStorages.GoogleDrive
                 {
                     folderId = await TryCreateFolder(folderId, folderName);
                 }
-                result.Success = true;
+                result.Status = Status.Success;
             }
             catch (Exception e)
             {
@@ -150,7 +150,7 @@ namespace CloudStorages.GoogleDrive
                 return (result, info);
 
             (result, info.userName, info.userEmail) = await GetUserInfoAsync();
-            if (result.Success)
+            if (result.Status == Status.Success)
                 (result, info.usedSpace, info.totalSpace) = await GetRootInfoAsync();
             return (result, info);
         }
@@ -202,7 +202,7 @@ namespace CloudStorages.GoogleDrive
             return null;
         }
 
-        public async Task<(CloudStorageResult result, bool IsNeedLogin)> InitAsync()
+        public async Task<CloudStorageResult> InitAsync()
         {
             CloudStorageResult result = new CloudStorageResult();
             bool IsNeedLogin = true;
@@ -213,6 +213,7 @@ namespace CloudStorages.GoogleDrive
                 LastRefreshToken = LoadRefreshTokenDelegate?.Invoke();
 
                 // 初始化
+                result.Status = Status.NeedAuthenticate;
                 oauthClient = new GoogleDriveOauthClient(ApiKey, ApiSecret);
                 if (!string.IsNullOrEmpty(LastRefreshToken))
                 {
@@ -223,19 +224,18 @@ namespace CloudStorages.GoogleDrive
                     }
                     else
                     {
+                        result.Status = Status.Success;
                         // 儲存新的access token/refresh token
                         SaveAccessTokenDelegate?.Invoke(oauthClient.AccessToken);
                         InitDriveService();
                     }
                 }
-                result.Success = true;
             }
             catch (Exception ex)
             {
-                result.Success = false;
                 result.Message = ex.Message;
             }
-            return (result, IsNeedLogin);
+            return result;
         }
 
         public async Task<(CloudStorageResult, CloudStorageAccountInfo)> LoginAsync()
@@ -249,7 +249,7 @@ namespace CloudStorages.GoogleDrive
                     SaveAccessTokenDelegate?.Invoke(oauthClient.AccessToken);
                     SaveRefreshTokenDelegate?.Invoke(oauthClient.RefreshToken);
                     (result, accountInfo.userName, accountInfo.userEmail) = await GetUserInfoAsync();
-                    if (result.Success)
+                    if (result.Status == Status.Success)
                     {
                         InitDriveService();
                         (result, accountInfo.usedSpace, accountInfo.totalSpace) = await GetRootInfoAsync();
@@ -258,7 +258,6 @@ namespace CloudStorages.GoogleDrive
             }
             catch (Exception ex)
             {
-                result.Success = false;
                 result.Message = ex.Message;
             }
             return (result, accountInfo);
@@ -291,11 +290,10 @@ namespace CloudStorages.GoogleDrive
                 About about = await getRequest.ExecuteAsync();
                 totalSpace = about.StorageQuota.Limit ?? -1;
                 usedSpace = about.StorageQuota.Usage ?? -1;
-                result.Success = true;
+                result.Status = Status.Success;
             }
             catch (Exception ex)
             {
-                result.Success = false;
                 result.Message = ex.Message;
             }
             return (result, usedSpace, totalSpace);
@@ -338,12 +336,11 @@ namespace CloudStorages.GoogleDrive
                     Newtonsoft.Json.Linq.JObject jObject = Newtonsoft.Json.Linq.JObject.Parse(responseFromServer);
                     userEmail = jObject["email"]?.ToString();
                     userName = jObject["name"]?.ToString();
-                    result.Success = true;
+                    result.Status = Status.Success;
                 }
             }
             catch (Exception ex)
             {
-                result.Success = false;
                 result.Message = ex.Message;
             }
             return (result, userName, userEmail);

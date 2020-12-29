@@ -73,17 +73,15 @@ namespace ConsoleSample
 
         private static async Task Test(ICloudStorageClient client)
         {
-            var (result, isNeedLogin) = await client.InitAsync();
-            if (!result.Success)
+            var result = await client.InitAsync();
+            if (result.Status != Status.Success)
             {
                 Console.WriteLine("Initial failed, reason=" + result.Message);
                 return;
             }
-            else
-                Console.WriteLine("Initial success, isNeedLogin=" + isNeedLogin);
-
+            
             CloudStorageAccountInfo accountInfo;
-            if (isNeedLogin)
+            if (result.Status == Status.NeedAuthenticate)
             {
                 (result, accountInfo) = await client.LoginAsync();
                 client.StopListen();
@@ -91,7 +89,7 @@ namespace ConsoleSample
             else
                 (result, accountInfo) = await client.GetAccountInfoAsync();
 
-            if (!result.Success)
+            if (result.Status != Status.Success)
             {
                 Console.WriteLine("Login failed, reason=" + result.Message);
                 return;
@@ -103,7 +101,7 @@ namespace ConsoleSample
 
             string folderId, folderName = "/test/folder1";
             (result, folderId) = await client.CreateFolderAsync(folderName);
-            if (!result.Success)
+            if (result.Status != Status.Success)
             {
                 Console.WriteLine("Create folder failed, reason=" + result.Message);
                 return;
@@ -114,7 +112,7 @@ namespace ConsoleSample
             File.WriteAllText(localFile, "I am a test file.");
             CancellationTokenSource cts = new CancellationTokenSource();
             result = await client.UploadFileToFolderByPathAsync(localFile, cts.Token, folderName);
-            if (!result.Success)
+            if (result.Status != Status.Success)
             {
                 Console.WriteLine("Upload file failed, reason=" + result.Message);
                 return;
@@ -124,7 +122,7 @@ namespace ConsoleSample
 
             string cloudFile = folderName + "/" + localFile;
             result = await client.DownloadFileByPathAsync(cloudFile, localFile, cts.Token);
-            if (!result.Success)
+            if (result.Status != Status.Success)
             {
                 Console.WriteLine("Download file failed, reason=" + result.Message);
                 return;
@@ -132,7 +130,7 @@ namespace ConsoleSample
             Console.WriteLine($"Downloaded file {localFile}");
 
             result = await client.DeleteFileByPathAsync(cloudFile);
-            if (!result.Success)
+            if (result.Status != Status.Success)
             {
                 Console.WriteLine("Delete file failed, reason=" + result.Message);
                 return;
