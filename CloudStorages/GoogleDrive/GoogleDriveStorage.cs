@@ -17,7 +17,7 @@ namespace CloudStorages.GoogleDrive
         private const string UerInfoEndpoint = "https://www.googleapis.com/userinfo/v2/me?oauth_token=";
         private const string FOLDER_TYPE = "application/vnd.google-apps.folder";
         private readonly string ApiKey, ApiSecret, AppName;
-        private string LastRefreshToken;
+        //private string LastRefreshToken;
         private GoogleDriveOauthClient oauthClient;
         private DriveService driveService;
 
@@ -51,6 +51,7 @@ namespace CloudStorages.GoogleDrive
             return (result, folderId);
         }
 
+        [Obsolete]
         public async Task<(CloudStorageResult result, string folderId)> CreateFolderAsync(string fullFolderPath)
         {
             CloudStorageResult result = new CloudStorageResult();
@@ -127,17 +128,7 @@ namespace CloudStorages.GoogleDrive
             throw new NotImplementedException();
         }
 
-        public Task<CloudStorageResult> DeleteFileByPathAsync(string filePath)
-        {
-            throw new NotImplementedException();
-        }
-
         public Task<CloudStorageResult> DownloadFileByIdAsync(string fileID, string savePath, CancellationToken ct)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<CloudStorageResult> DownloadFileByPathAsync(string filePath, string savePath, CancellationToken ct)
         {
             throw new NotImplementedException();
         }
@@ -146,8 +137,6 @@ namespace CloudStorages.GoogleDrive
         {
             CloudStorageResult result = new CloudStorageResult();
             CloudStorageAccountInfo info = new CloudStorageAccountInfo();
-            if (string.IsNullOrEmpty(LastRefreshToken))
-                return (result, info);
 
             (result, info.userName, info.userEmail) = await GetUserInfoAsync();
             if (result.Status == Status.Success)
@@ -165,12 +154,12 @@ namespace CloudStorages.GoogleDrive
             throw new NotImplementedException();
         }
 
-        public string GetFolderId(string parentId, string folderName)
+        public async Task<string> GetRootFolderIdAsync()
         {
             throw new NotImplementedException();
         }
 
-        public string GetFolderId(string fullFolderPath)
+        public async Task<string> GetFolderIdAsync(string parentId, string folderName)
         {
             throw new NotImplementedException();
         }
@@ -210,7 +199,7 @@ namespace CloudStorages.GoogleDrive
             try
             {
                 // 取得上次登入資訊
-                LastRefreshToken = LoadRefreshTokenDelegate?.Invoke();
+                string LastRefreshToken = LoadRefreshTokenDelegate?.Invoke();
 
                 // 初始化
                 result.Status = Status.NeedAuthenticate;
@@ -354,12 +343,7 @@ namespace CloudStorages.GoogleDrive
             oauthClient = null;
         }
 
-        public Task<CloudStorageResult> UploadFileToFolderByIdAsync(string filePath, CancellationToken ct, string folderId = null)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<CloudStorageResult> UploadFileToFolderByPathAsync(string filePath, CancellationToken ct, string folderName = null)
+        public async Task<(CloudStorageResult, CloudStorageFile)> UploadFileToFolderByIdAsync(string filePath, string folderId, CancellationToken ct)
         {
             throw new NotImplementedException();
         }

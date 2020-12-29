@@ -66,6 +66,12 @@ namespace CloudStorages.DropBox
                     result.Status = Status.Success;
                     InitDriveService();
                 }
+                else
+                {
+                    // each token is empty, need login
+                    result.Status = Status.NeedAuthenticate;
+                    result.Message = "Empty access and refresh token.";
+                }
             }
             catch (Exception ex)
             {
@@ -86,6 +92,7 @@ namespace CloudStorages.DropBox
                     SaveAccessTokenDelegate?.Invoke(oAuthWrapper.AccessToken);
                     SaveRefreshTokenDelegate?.Invoke(oAuthWrapper.RefreshToken);
                     LastRefreshToken = oAuthWrapper.RefreshToken;
+                    LastAccessToken = oAuthWrapper.AccessToken;
                     InitDriveService();
                     (result, accountInfo.userName, accountInfo.userEmail) = await GetUserInfoAsync();
                     if (result.Status == Status.Success)
@@ -179,7 +186,7 @@ namespace CloudStorages.DropBox
             return await CreateFolderAsync(parentId + folderName);
         }
 
-        public async Task<(CloudStorageResult result, string folderId)> CreateFolderAsync(string fullFolderPath)
+        private async Task<(CloudStorageResult result, string folderId)> CreateFolderAsync(string fullFolderPath)
         {
             CloudStorageResult result = new CloudStorageResult();
             string folderId;
@@ -227,9 +234,9 @@ namespace CloudStorages.DropBox
                 return result;
             try
             {
-                fileID = fileID.Replace("id:", string.Empty);  // 要刪除前綴 "id:" 才是 dropbox 正確格式
+                //fileID = fileID.Replace("id:", string.Empty);  // 要刪除前綴 "id:" 才是 dropbox 正確格式
                 List<string> deletedIds = new List<string> { fileID };
-                var deleteResult = await dropboxClient.FileRequests.DeleteAsync(deletedIds);
+                var deleteResult = await dropboxClient.Files.DeleteV2Async(fileID);
                 result.Status = Status.Success;
             }
             catch (ApiException<Dropbox.Api.FileRequests.DeleteFileRequestError> ex)
@@ -243,6 +250,7 @@ namespace CloudStorages.DropBox
             return result;
         }
 
+        [Obsolete]
         public async Task<CloudStorageResult> DeleteFileByPathAsync(string filePath)
         {
             CloudStorageResult result = new CloudStorageResult();
@@ -265,7 +273,7 @@ namespace CloudStorages.DropBox
             return await DownloadFileByPathAsync(fileID, savePath, ct);
         }
 
-        public async Task<CloudStorageResult> DownloadFileByPathAsync(string filePath, string savePath, CancellationToken ct)
+        private async Task<CloudStorageResult> DownloadFileByPathAsync(string filePath, string savePath, CancellationToken ct)
         {
             CloudStorageResult result = new CloudStorageResult();
             try
@@ -309,12 +317,12 @@ namespace CloudStorages.DropBox
             return result;
         }
 
-        public async Task<CloudStorageFile> GetFileInfoAsync(string filePath)
+        public async Task<CloudStorageFile> GetFileInfoAsync(string fileId)
         {
             CloudStorageFile fileInfo;
             try
             {
-                var metadata = await dropboxClient.Files.GetMetadataAsync(filePath);
+                var metadata = await dropboxClient.Files.GetMetadataAsync(fileId);
                 fileInfo = new CloudStorageFile
                 {
                     Name = metadata.Name,
@@ -326,17 +334,17 @@ namespace CloudStorages.DropBox
             }
             catch (Exception ex)
             {
-                throw new FileNotFoundException(ex.Message, filePath);
+                throw new FileNotFoundException(ex.Message, fileId);
             }
             return fileInfo;
         }
 
-        public async Task<IEnumerable<CloudStorageFile>> GetFileInfosInPathAsync(string folderPath)
+        public async Task<IEnumerable<CloudStorageFile>> GetFileInfosInPathAsync(string folderId)
         {
             List<CloudStorageFile> fileInfos = new List<CloudStorageFile>();
             try
             {
-                var listResult = await dropboxClient.Files.ListFolderAsync(folderPath);
+                var listResult = await dropboxClient.Files.ListFolderAsync(folderId);
                 AddEntries(listResult.Entries);
                 while (listResult.HasMore)
                 {
@@ -362,19 +370,46 @@ namespace CloudStorages.DropBox
             }
             catch (Exception ex)
             {
-                throw new FileNotFoundException(ex.Message, folderPath);
+                throw new FileNotFoundException(ex.Message, folderId);
             }
             return fileInfos;
         }
 
-        public string GetFolderId(string parentId, string folderName)
+        /// <summary>
+        /// Dropbox root folder does not have an Id. Use "" or "/" instead.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<string> GetRootFolderIdAsync()
         {
-            throw new NotImplementedException();
+            return "";
         }
 
-        public string GetFolderId(string fullFolderPath)
+        public async Task<string> GetFolderIdAsync(string parentId, string folderName)
         {
-            throw new NotImplementedException();
+            try
+            {
+                List<Metadata> entries = new List<Metadata>();
+                var listResult = await dropboxClient.Files.ListFolderAsync(parentId);
+                entries.AddRange(listResult.Entries);
+                while (listResult.HasMore)
+                {
+                    listResult = await dropboxClient.Files.ListFolderContinueAsync(listResult.Cursor);
+                    entries.AddRange(listResult.Entries);
+                }
+
+                foreach (Metadata metadata in entries)
+                {
+                    if (metadata.IsFolder && metadata.Name == folderName)
+                    {
+                        return metadata.AsFolder.Id;
+                    }
+                }
+                return null;
+            }
+            catch (Exception e)
+            {
+                return null;
+            }
         }
 
         public void StopListen()
@@ -382,27 +417,29 @@ namespace CloudStorages.DropBox
             oAuthWrapper?.StopListen();
         }
 
-        public async Task<CloudStorageResult> UploadFileToFolderByIdAsync(string filePath, CancellationToken ct, string folderId = null)
+        public async Task<(CloudStorageResult, CloudStorageFile)> UploadFileToFolderByIdAsync(string filePath, string folderId, CancellationToken ct)
         {
             // check valid folder id format
             if (string.IsNullOrEmpty(folderId))
                 folderId = "/";  // dropbox root folder
             else if (!folderId.StartsWith("id:"))
-                return new CloudStorageResult {Message = "Wrong dropbox folder id format."};
+                return (new CloudStorageResult {Message = "Wrong dropbox folder id format."}, null);
 
-            return await UploadFileToFolderByPathAsync(filePath, ct, folderId);
+            return await UploadFileToFolderByPathAsync(filePath, folderId, ct);
         }
 
-        public async Task<CloudStorageResult> UploadFileToFolderByPathAsync(string filePath, CancellationToken ct, string folderName = null)
+        private async Task<(CloudStorageResult, CloudStorageFile)> UploadFileToFolderByPathAsync(string filePath, string folderName, CancellationToken ct)
         {
             CloudStorageResult result = new CloudStorageResult();
+            CloudStorageFile cloudFile = null;
             try
             {
                 FileInfo fileInfo = new FileInfo(filePath);
                 if (!fileInfo.Exists)
                 {
+                    result.Status = Status.NotFound;
                     result.Message = $"File '{filePath}' does not exist.";
-                    return result;
+                    return (result, null);
                 }
 
                 // upload to dropbox root folder if folderName is empty
@@ -412,12 +449,12 @@ namespace CloudStorages.DropBox
                 long fileSize = fileInfo.Length;
                 if (fileSize <= CHUNK_SIZE)
                 {
-                    await UploadSmaillFile(filePath, folderName);
+                    cloudFile = await UploadSmaillFile(filePath, folderName);
                     OnProgressChanged(fileSize);  // 一次回報全部進度
                 }
                 else
                 {
-                    await UploadBigFile(filePath, folderName, ct);
+                    cloudFile = await UploadBigFile(filePath, folderName, ct);
                 }
                 result.Status = Status.Success;
             }
@@ -430,13 +467,13 @@ namespace CloudStorages.DropBox
             {
                 result.Message = ex.Message;
             }
-            return result;
+            return (result, cloudFile);
         }
 
         /// <summary>
         /// 上傳小於等於 CHUNK_SIZE 的檔案。不檢查輸入檔案，不會回報進度，也不能取消。
         /// </summary>
-        private async Task<string> UploadSmaillFile(string filePath, string parentFolder)
+        private async Task<CloudStorageFile> UploadSmaillFile(string filePath, string parentFolder)
         {
             using (FileStream fileStream = new FileStream(filePath, FileMode.Open))
             {
@@ -445,14 +482,21 @@ namespace CloudStorages.DropBox
                 parentFolder += Path.GetFileName(filePath);
                 var uploadResult = await dropboxClient.Files.UploadAsync(parentFolder, autorename: true, body: fileStream);
                 Console.WriteLine("Finished small file: " + uploadResult.PathDisplay);
-                return uploadResult.Id;
+                CloudStorageFile cloudFile = new CloudStorageFile()
+                {
+                    Id = uploadResult.Id,
+                    ModifiedTime = uploadResult.ServerModified,
+                    Name = uploadResult.Name,
+                    Size = (long) uploadResult.Size
+                };
+                return cloudFile;
             }
         }
 
         /// <summary>
         /// 批次上傳大檔案，必須要大於 CHUNK_SIZE。僅會檢查檔案大小是否夠大。
         /// </summary>
-        private async Task<string> UploadBigFile(string filePath, string parentFolder, CancellationToken ct)
+        private async Task<CloudStorageFile> UploadBigFile(string filePath, string parentFolder, CancellationToken ct)
         {
             FileInfo fileInfo = new FileInfo(filePath);
             // file size must larger than 1 chunk size
@@ -519,11 +563,10 @@ namespace CloudStorages.DropBox
                 CommitInfo info = new CommitInfo(parentFolder, autorename: true);
 
                 // do last session
-                string fileId;
+                FileMetadata finishResult;
                 using (MemoryStream tempStream = new MemoryStream(buffer, 0, length, false))
                 {
-                    var finishResult = await dropboxClient.Files.UploadSessionFinishAsync(endCursor, info, tempStream);
-                    fileId = finishResult.Id;
+                    finishResult = await dropboxClient.Files.UploadSessionFinishAsync(endCursor, info, tempStream);
                     Console.WriteLine("Finished large file: " + finishResult.PathDisplay);
                 }
 
@@ -531,7 +574,16 @@ namespace CloudStorages.DropBox
                 OnProgressChanged(length);
 
                 fileStream.Close();
-                return fileId;
+
+                // return new file info
+                CloudStorageFile cloudFile = new CloudStorageFile()
+                {
+                    Id = finishResult.Id,
+                    ModifiedTime = finishResult.ServerModified,
+                    Name = finishResult.Name,
+                    Size = (long) finishResult.Size
+                };
+                return cloudFile;
             }
         }
 
