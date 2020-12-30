@@ -338,8 +338,7 @@ ASALocalRun/
 
 # BeatPulse healthcheck temp database
 healthchecksdb
-dbaccess.txt
-dbkey.txt
-dbrefresh.txt
-gdkey.txt
-gdsecret.txt
+*access.txt
+*refresh.txt
+*key.txt
+*secret.txt
