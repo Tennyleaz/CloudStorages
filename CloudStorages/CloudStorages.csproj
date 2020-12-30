@@ -102,13 +102,13 @@
     <Compile Include="IOauthClient.cs" />
     <Compile Include="IUriHandler.cs" />
     <Compile Include="Models.cs" />
+    <Compile Include="OneDrive\OneDriveOauthClient.cs" />
+    <Compile Include="OneDrive\OneDriveStorage.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Status.cs" />
     <Compile Include="Utility.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="OneDrive\" />
-  </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <None Include="app.config" />
     <None Include="packages.config" />

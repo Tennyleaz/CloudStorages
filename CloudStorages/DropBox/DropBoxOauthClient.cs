@@ -490,55 +490,6 @@ namespace CloudStorages.DropBox
                 }
             }
         }
-
-        public class OAuth2Response
-        {
-            public string AccessToken { get; private set; }
-
-            public string Uid { get; private set; }
-
-            public string State { get; private set; }
-
-            public string TokenType { get; private set; }
-
-            public string RefreshToken { get; private set; }
-
-            public DateTime? ExpiresAt { get; private set; }
-
-            public string[] ScopeList { get; private set; }
-
-            internal OAuth2Response(string accessToken, string refreshToken, string uid, string state, string tokenType, int expiresIn, string[] scopeList)
-            {
-                if (string.IsNullOrEmpty(accessToken) || uid == null)
-                {
-                    throw new ArgumentException("Invalid OAuth 2.0 response, missing access_token and/or uid.");
-                }
-
-                this.AccessToken = accessToken;
-                this.Uid = uid;
-                this.State = state;
-                this.TokenType = tokenType;
-                this.RefreshToken = refreshToken;
-                this.ExpiresAt = DateTime.Now.AddSeconds(expiresIn);
-                this.ScopeList = scopeList;
-            }
-
-            internal OAuth2Response(string accessToken, string uid, string state, string tokenType)
-            {
-                if (string.IsNullOrEmpty(accessToken) || uid == null)
-                {
-                    throw new ArgumentException("Invalid OAuth 2.0 response, missing access_token and/or uid.");
-                }
-
-                this.AccessToken = accessToken;
-                this.Uid = uid;
-                this.State = state;
-                this.TokenType = tokenType;
-                this.RefreshToken = null;
-                this.ExpiresAt = null;
-                this.ScopeList = null;
-            }
-        }
         #endregion
 
         private static string GeneratePKCECodeVerifier()
