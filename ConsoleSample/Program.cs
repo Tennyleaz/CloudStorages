@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using CloudStorages;
 using CloudStorages.DropBox;
 using CloudStorages.GoogleDrive;
+using CloudStorages.OneDrive;
 
 namespace ConsoleSample
 {
@@ -31,10 +32,6 @@ namespace ConsoleSample
                 }
 
                 ICloudStorageClient dropBoxClient = new DropBoxStorage(apiKey, redirectUrl);
-                dropBoxClient.SaveAccessTokenDelegate = SaveAccessToken;
-                dropBoxClient.SaveRefreshTokenDelegate = SaveRefreshToken;
-                dropBoxClient.LoadAccessTokenDelegate = LoadAccessToken;
-                dropBoxClient.LoadRefreshTokenDelegate = LoadRefresToken;
 
                 Task.Run(() => Test(dropBoxClient)).Wait();
                 Console.Write("Finish testing dropbox.\n\n");
@@ -54,13 +51,24 @@ namespace ConsoleSample
                 }
 
                 ICloudStorageClient googleClient = new GoogleDriveStorage(apiKey, apiSecret, appName);
-                //googleClient.SaveAccessTokenDelegate = SaveAccessToken;
-                //googleClient.SaveRefreshTokenDelegate = SaveRefreshToken;
-                //googleClient.LoadAccessTokenDelegate = LoadAccessToken;
-                //googleClient.LoadRefreshTokenDelegate = LoadRefresToken;
 
                 Task.Run(() => Test(googleClient)).Wait();
                 Console.Write("Finish testing google drive.\n\n");
+
+                // create onedrive client
+                try
+                {
+                    apiKey = File.ReadAllText(@"D:\Test Dir\CloudStorages\odkey.txt");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Cannot read api key: " + ex.Message);
+                    throw ex;
+                }
+                ICloudStorageClient onedriveClient = new OneDriveStorage(apiKey);
+
+                Task.Run(() => Test(onedriveClient)).Wait();
+                Console.Write("Finish testing onedrive.\n\n");
             }
             catch (Exception e)
             {
@@ -73,6 +81,12 @@ namespace ConsoleSample
 
         private static async Task Test(ICloudStorageClient client)
         {
+            TokenManager tokenManager = new TokenManager(client.GetType().Name);
+            client.SaveAccessTokenDelegate = tokenManager.SaveAccessToken;
+            client.SaveRefreshTokenDelegate = tokenManager.SaveRefreshToken;
+            client.LoadAccessTokenDelegate = tokenManager.LoadAccessToken;
+            client.LoadRefreshTokenDelegate = tokenManager.LoadRefresToken;
+
             var result = await client.InitAsync();
             if (result.Status != Status.Success)
             {
@@ -94,7 +108,7 @@ namespace ConsoleSample
                 return;
             }
             
-            Console.WriteLine("Login success, account=" + accountInfo.userEmail);
+            Console.WriteLine("Login success, account=" + accountInfo.userEmail + ", username=" + accountInfo.userName);
             IFormatProvider formatter = new CloudStorages.Utility.FileSizeFormatProvider();
             Console.WriteLine(string.Format(formatter, "Account space: {0:fs} / {1:fs}", accountInfo.usedSpace, accountInfo.totalSpace));
 
@@ -136,63 +150,35 @@ namespace ConsoleSample
                 Console.WriteLine("Delete file failed, reason=" + result.Message);
                 return;
             }
-            Console.WriteLine($"Deleted file {localFile}");
-        }
+            Console.WriteLine($"Deleted file '{cloudFile.Name}'");
 
-        #region Token save/load
-        private static string LoadAccessToken()
-        {
-            try
+            // test a larger file
+            const string testPic = @"D:\Test Dir\CloudStorages\surprised pikachu.png";
+            (result, cloudFile) = await client.UploadFileToFolderByIdAsync(testPic, folderId, cts.Token);
+            if (result.Status != Status.Success)
             {
-                string path = @"D:\Test Dir\CloudStorages\dbaccess.txt";
-                return File.ReadAllText(path);
+                Console.WriteLine("Upload large file failed, reason=" + result.Message);
+                return;
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-                return null;
-            }
-        }
+            Console.WriteLine($"Uploaded large file '{testPic}'");
 
-        private static string LoadRefresToken()
-        {
-            try
+            const string testPic2 = @"D:\Test Dir\CloudStorages\surprised pikachu 2.png";
+            result = await client.DownloadFileByIdAsync(cloudFile.Id, testPic2, cts.Token);
+            if (result.Status != Status.Success)
             {
-                string path = @"D:\Test Dir\CloudStorages\dbrefresh.txt";
-                return File.ReadAllText(path);
+                Console.WriteLine("Download large file failed, reason=" + result.Message);
+                return;
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-                return null;
-            }
-        }
+            Console.WriteLine($"Downloaded large file '{testPic2}'");
 
-        private static void SaveAccessToken(string token)
-        {
-            try
+            result = await client.DeleteFileByIdAsync(cloudFile.Id);
+            if (result.Status != Status.Success)
             {
-                string path = @"D:\Test Dir\CloudStorages\dbaccess.txt";
-                File.WriteAllText(path, token);
+                Console.WriteLine("Delete file failed, reason=" + result.Message);
+                return;
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
+            Console.WriteLine($"Deleted file '{cloudFile.Name}'");
+            File.Delete(testPic2);
         }
-
-        private static void SaveRefreshToken(string token)
-        {
-            try
-            {
-                string path = @"D:\Test Dir\CloudStorages\dbrefresh.txt";
-                File.WriteAllText(path, token);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-        }
-        #endregion
     }
 }
