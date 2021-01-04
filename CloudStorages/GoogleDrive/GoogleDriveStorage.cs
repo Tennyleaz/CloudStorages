@@ -16,10 +16,12 @@ namespace CloudStorages.GoogleDrive
     {
         private const string UerInfoEndpoint = "https://www.googleapis.com/userinfo/v2/me?oauth_token=";
         private const string FOLDER_TYPE = "application/vnd.google-apps.folder";
+        private const int CHUNK_SIZE = Google.Apis.Upload.ResumableUpload.MinimumChunkSize * 2;  // default is 512KB
         private readonly string ApiKey, ApiSecret, AppName;
-        //private string LastRefreshToken;
         private GoogleDriveOauthClient oauthClient;
         private DriveService driveService;
+        private TaskCompletionSource<bool> tcs;
+        private CloudStorageFile tempFile;
 
         public Func<string> LoadAccessTokenDelegate { get; set; }
         public Func<string> LoadRefreshTokenDelegate { get; set; }
@@ -123,14 +125,49 @@ namespace CloudStorages.GoogleDrive
             }
         }
 
-        public Task<CloudStorageResult> DeleteFileByIdAsync(string fileID)
+        public async Task<CloudStorageResult> DeleteFileByIdAsync(string fileID)
         {
-            throw new NotImplementedException();
+            CloudStorageResult result = new CloudStorageResult();
+            try
+            {
+                var deleteRequest = driveService.Files.Delete(fileID);
+                fileID = await deleteRequest.ExecuteAsync();
+                result.Status = Status.Success;
+            }
+            catch (Exception ex)
+            {
+                result.Message = ex.Message;
+            }
+            return result;
         }
 
-        public Task<CloudStorageResult> DownloadFileByIdAsync(string fileID, string savePath, CancellationToken ct)
+        public async Task<CloudStorageResult> DownloadFileByIdAsync(string fileID, string savePath, CancellationToken ct)
         {
-            throw new NotImplementedException();
+            CloudStorageResult result = new CloudStorageResult();
+            try
+            {
+                if (System.IO.File.Exists(savePath))
+                    System.IO.File.Delete(savePath);
+
+                var getRequest = driveService.Files.Get(fileID);
+                using (FileStream fileStream = new FileStream(savePath, FileMode.Create))
+                {
+                    getRequest.MediaDownloader.ChunkSize = CHUNK_SIZE;
+                    getRequest.MediaDownloader.ProgressChanged += OnProgressChangedDownload;
+                    var downloadProgress = await getRequest.DownloadAsync(fileStream, ct);
+                    result.Message = downloadProgress.ToString();
+                    if (downloadProgress.Status == Google.Apis.Download.DownloadStatus.Completed)
+                    {
+                        result.Status = Status.Success;
+                    }
+                    fileStream.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Message = ex.Message;
+            }
+            return result;
         }
 
         public async Task<(CloudStorageResult result, CloudStorageAccountInfo info)> GetAccountInfoAsync()
@@ -144,24 +181,59 @@ namespace CloudStorages.GoogleDrive
             return (result, info);
         }
 
-        public Task<CloudStorageFile> GetFileInfoAsync(string filePath)
+        public async Task<CloudStorageFile> GetFileInfoAsync(string fileId)
         {
-            throw new NotImplementedException();
+            var getRequest = driveService.Files.Get(fileId);
+            Google.Apis.Drive.v3.Data.File googleFile = await getRequest.ExecuteAsync();
+            CloudStorageFile fileInfo = new CloudStorageFile
+            {
+                Name = googleFile.Name,
+                Id = googleFile.Id,
+                CreatedTime = googleFile.CreatedTime ?? DateTime.MinValue,
+                ModifiedTime = googleFile.ModifiedTime ?? DateTime.MinValue,
+                Size = googleFile.Size ?? 0
+            };
+            return fileInfo;
         }
 
-        public Task<IEnumerable<CloudStorageFile>> GetFileInfosInPathAsync(string folderPath)
+        public async Task<IEnumerable<CloudStorageFile>> GetFileInfosInPathAsync(string folderId)
         {
-            throw new NotImplementedException();
+            List<CloudStorageFile> files = new List<CloudStorageFile>();
+
+            var listRequest = driveService.Files.List();
+            listRequest.Q = $"trashed=false and '{folderId}' in parents";
+            FileList googleFileList = await listRequest.ExecuteAsync();
+            foreach (Google.Apis.Drive.v3.Data.File googleFile in googleFileList.Files)
+            {
+                files.Add(new CloudStorageFile
+                {
+                    Name = googleFile.Name,
+                    Id = googleFile.Id,
+                    CreatedTime = googleFile.CreatedTime ?? DateTime.MinValue,
+                    ModifiedTime = googleFile.ModifiedTime ?? DateTime.MinValue,
+                    Size = googleFile.Size ?? 0
+                });
+            }
+
+            return files;
         }
 
-        public async Task<string> GetRootFolderIdAsync()
+        public Task<string> GetRootFolderIdAsync()
         {
-            throw new NotImplementedException();
+            return Task.FromResult("root");
         }
 
         public async Task<string> GetFolderIdAsync(string parentId, string folderName)
         {
-            throw new NotImplementedException();
+            try
+            {
+                return await FindFolderId(parentId, folderName);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+            return null;
         }
 
         private async Task<string> FindFolderId(string parentId, string folderName)
@@ -345,7 +417,72 @@ namespace CloudStorages.GoogleDrive
 
         public async Task<(CloudStorageResult, CloudStorageFile)> UploadFileToFolderByIdAsync(string filePath, string folderId, CancellationToken ct)
         {
-            throw new NotImplementedException();
+            CloudStorageResult result = new CloudStorageResult();
+            CloudStorageFile newFile = null;
+
+            try
+            {
+                Google.Apis.Drive.v3.Data.File file = new Google.Apis.Drive.v3.Data.File();
+                file.Name = Path.GetFileName(filePath);
+                if (!string.IsNullOrEmpty(folderId))
+                    file.Parents = new List<string> { folderId };
+
+                // fire after google upload completed
+                tcs = new TaskCompletionSource<bool>();
+
+                using (FileStream stream = new FileStream(filePath, FileMode.Open))
+                {
+                    var createRequest = driveService.Files.Create(file, stream, Utility.ContentTypes.GetContentType(filePath));
+                    createRequest.ProgressChanged += OnProgressChangedUpload;
+                    createRequest.ResponseReceived += Request_ResponseReceived;
+                    createRequest.ChunkSize = CHUNK_SIZE;
+                    var uploadProgress = await createRequest.UploadAsync(ct);
+                    result.Message = uploadProgress.ToString();
+                    if (uploadProgress.Status == Google.Apis.Upload.UploadStatus.Completed)
+                    {
+                        // wait google complete event
+                        await tcs.Task;
+
+                        result.Status = Status.Success;
+                        newFile = tempFile;
+                    }
+                    stream.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Message = ex.Message;
+            }
+            finally
+            {
+                tcs = null;
+            }
+            return (result, newFile);
+        }
+
+        private void OnProgressChangedUpload(Google.Apis.Upload.IUploadProgress progress)
+        {
+            var args = new CloudStorageProgressArgs { BytesSent = progress.BytesSent };
+            ProgressChanged?.Invoke(null, args);
+        }
+
+        private void OnProgressChangedDownload(Google.Apis.Download.IDownloadProgress progress)
+        {
+            var args = new CloudStorageProgressArgs { BytesSent = progress.BytesDownloaded };
+            ProgressChanged?.Invoke(null, args);
+        }
+
+        private void Request_ResponseReceived(Google.Apis.Drive.v3.Data.File file)
+        {
+            tempFile = new CloudStorageFile
+            {
+                Name = file.Name,
+                Id = file.Id,
+                CreatedTime = file.CreatedTime ?? DateTime.MinValue,
+                ModifiedTime = file.ModifiedTime ?? DateTime.MinValue,
+                Size = file.Size ?? 0
+            };
+            tcs?.TrySetResult(true);
         }
     }
 }
