@@ -1,4 +1,7 @@
 # CloudStorages
+
+![MSBuild](https://github.com/Tennyleaz/CloudStorages/workflows/MSBuild/badge.svg)
+
 An universal API client library for popular cloud storage providers.
 
 ## Features
