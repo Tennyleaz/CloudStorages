@@ -23,6 +23,7 @@ namespace CloudStorages
         public string Id;
         public DateTime ModifiedTime;
         public DateTime CreatedTime;
+        public bool IsFolder;
     }
 
     public class CloudStorageProgressArgs : EventArgs

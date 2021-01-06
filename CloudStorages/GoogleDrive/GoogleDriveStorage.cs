@@ -191,7 +191,8 @@ namespace CloudStorages.GoogleDrive
                 Id = googleFile.Id,
                 CreatedTime = googleFile.CreatedTime ?? DateTime.MinValue,
                 ModifiedTime = googleFile.ModifiedTime ?? DateTime.MinValue,
-                Size = googleFile.Size ?? 0
+                Size = googleFile.Size ?? 0,
+                IsFolder = googleFile.MimeType == FOLDER_TYPE
             };
             return fileInfo;
         }
@@ -202,6 +203,7 @@ namespace CloudStorages.GoogleDrive
 
             var listRequest = driveService.Files.List();
             listRequest.Q = $"trashed=false and '{folderId}' in parents";
+            listRequest.Fields = "files(name, id, mimeType, size, createdTime, modifiedTime)";  // fields are case sensitive
             FileList googleFileList = await listRequest.ExecuteAsync();
             foreach (Google.Apis.Drive.v3.Data.File googleFile in googleFileList.Files)
             {
@@ -211,7 +213,8 @@ namespace CloudStorages.GoogleDrive
                     Id = googleFile.Id,
                     CreatedTime = googleFile.CreatedTime ?? DateTime.MinValue,
                     ModifiedTime = googleFile.ModifiedTime ?? DateTime.MinValue,
-                    Size = googleFile.Size ?? 0
+                    Size = googleFile.Size ?? 0,
+                    IsFolder = googleFile.MimeType == FOLDER_TYPE
                 });
             }
 

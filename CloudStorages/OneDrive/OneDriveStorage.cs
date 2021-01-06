@@ -185,7 +185,8 @@ namespace CloudStorages.OneDrive
                 Id = item.Id,
                 CreatedTime = item.CreatedDateTime?.DateTime ?? DateTime.MinValue,
                 ModifiedTime = item.LastModifiedDateTime?.DateTime ?? DateTime.MinValue,
-                Size = item.Size ?? 0
+                Size = item.Size ?? 0,
+                IsFolder = (item.Folder != null)
             };
         }
 
@@ -209,7 +210,8 @@ namespace CloudStorages.OneDrive
                         CreatedTime = item.CreatedDateTime?.LocalDateTime ?? DateTime.MinValue,
                         ModifiedTime = item.LastModifiedDateTime?.LocalDateTime ?? DateTime.MinValue,
                         Id = item.Id,
-                        Size = item.Size ?? 0
+                        Size = item.Size ?? 0,
+                        IsFolder = (item.Folder != null)
                     });
                 }
 

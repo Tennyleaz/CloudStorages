@@ -323,14 +323,29 @@ namespace CloudStorages.DropBox
             try
             {
                 var metadata = await dropboxClient.Files.GetMetadataAsync(fileId);
-                fileInfo = new CloudStorageFile
+                if (metadata.IsFile)
                 {
-                    Name = metadata.Name,
-                    //CreatedTime = ;
-                    ModifiedTime = metadata.AsFile.ServerModified,
-                    Id = metadata.AsFile.Id,
-                    Size = (long) metadata.AsFile.Size
-                };
+                    fileInfo = new CloudStorageFile
+                    {
+                        Name = metadata.Name,
+                        //CreatedTime = ,
+                        ModifiedTime = metadata.AsFile.ServerModified,
+                        Id = metadata.AsFile.Id,
+                        Size = (long)metadata.AsFile.Size
+                    };
+                }
+                else
+                {
+                    fileInfo = new CloudStorageFile
+                    {
+                        Name = metadata.Name,
+                        //CreatedTime = ,
+                        //ModifiedTime = ,
+                        Id = metadata.AsFile.Id,
+                        //Size = ,
+                        IsFolder = true
+                    };
+                }
             }
             catch (Exception ex)
             {
@@ -356,15 +371,31 @@ namespace CloudStorages.DropBox
                 {
                     foreach (var f in entries)
                     {
-                        CloudStorageFile file = new CloudStorageFile
+                        if (f.IsFile)
                         {
-                            Name = f.Name,
-                            //CreatedTime = ;
-                            ModifiedTime = f.AsFile.ServerModified,
-                            Id = f.AsFile.Id,
-                            Size = (long) f.AsFile.Size
-                        };
-                        fileInfos.Add(file);
+                            CloudStorageFile file = new CloudStorageFile
+                            {
+                                Name = f.Name,
+                                //CreatedTime = ,
+                                ModifiedTime = f.AsFile.ServerModified,
+                                Id = f.AsFile.Id,
+                                Size = (long)f.AsFile.Size
+                            };
+                            fileInfos.Add(file);
+                        }
+                        else
+                        {
+                            CloudStorageFile file = new CloudStorageFile
+                            {
+                                Name = f.Name,
+                                //CreatedTime = ,
+                                //ModifiedTime = ,
+                                Id = f.AsFolder.Id,
+                                //Size = 
+                                IsFolder = true
+                            };
+                            fileInfos.Add(file);
+                        }
                     }
                 }
             }
