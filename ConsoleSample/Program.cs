@@ -81,6 +81,7 @@ namespace ConsoleSample
 
         private static async Task Test(ICloudStorageClient client)
         {
+            // login
             TokenManager tokenManager = new TokenManager(client.GetType().Name);
             client.SaveAccessTokenDelegate = tokenManager.SaveAccessToken;
             client.SaveRefreshTokenDelegate = tokenManager.SaveRefreshToken;
@@ -93,6 +94,7 @@ namespace ConsoleSample
                 Console.WriteLine("Initial failed, status=" + result.Status + ", reason=" + result.Message);
             }
             
+            // get accout info
             CloudStorageAccountInfo accountInfo;
             if (result.Status == Status.NeedAuthenticate)
             {
@@ -112,8 +114,22 @@ namespace ConsoleSample
             IFormatProvider formatter = new CloudStorages.Utility.FileSizeFormatProvider();
             Console.WriteLine(string.Format(formatter, "Account space: {0:fs} / {1:fs}", accountInfo.usedSpace, accountInfo.totalSpace));
 
+            // list root folder
             string rootId = await client.GetRootFolderIdAsync();
+            Console.WriteLine("\nFiles in root folder:");
+            var rootFiles = await client.GetFileInfosInPathAsync(rootId);
+            foreach (var cloudStorageFile in rootFiles)
+            {
+                string line = "  ";
+                if (cloudStorageFile.IsFolder)
+                    line += cloudStorageFile.Name + "\\";
+                else
+                    line += string.Format(formatter, "{0,-40} {2:yyyy-MM-dd HH:mm:ss}  {1:fs}", cloudStorageFile.Name, cloudStorageFile.Size, cloudStorageFile.ModifiedTime);
+                Console.WriteLine(line);
+            }
+            Console.WriteLine();
 
+            // create folder
             string folderId, folderName = "test";
             (result, folderId) = await client.CreateFolderAsync(rootId, folderName);
             if (result.Status != Status.Success)
@@ -179,6 +195,15 @@ namespace ConsoleSample
             }
             Console.WriteLine($"Deleted file '{cloudFile.Name}'");
             File.Delete(testPic2);
+
+            // delete test directory
+            result = await client.DeleteFileByIdAsync(folderId);
+            if (result.Status != Status.Success)
+            {
+                Console.WriteLine($"Delete folder id {folderId} failed, reason={result.Message}");
+                return;
+            }
+            Console.WriteLine($"Deleted folder id '{folderId}'");
         }
     }
 }
