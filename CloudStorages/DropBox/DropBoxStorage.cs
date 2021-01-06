@@ -379,9 +379,9 @@ namespace CloudStorages.DropBox
         /// Dropbox root folder does not have an Id. Use "" or "/" instead.
         /// </summary>
         /// <returns></returns>
-        public async Task<string> GetRootFolderIdAsync()
+        public Task<string> GetRootFolderIdAsync()
         {
-            return "";
+            return Task.FromResult("");
         }
 
         public async Task<string> GetFolderIdAsync(string parentId, string folderName)
