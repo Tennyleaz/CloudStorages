@@ -176,14 +176,30 @@ namespace CloudStorages.DropBox
         public async Task<(CloudStorageResult result, string folderId)> CreateFolderAsync(string parentId, string folderName)
         {
             // check valid folder id format
+            string fullFolderPath = null;
             if (string.IsNullOrEmpty(parentId))
-                parentId = "/";  // dropbox root folder
-            else if (!parentId.StartsWith("id:"))
+                fullFolderPath = "/";  // dropbox root folder
+            else if (parentId.StartsWith("id:"))
+            {
+                // convert id into absolute path
+                fullFolderPath = await TryGetFullPathAsync(parentId);
+                if (string.IsNullOrEmpty(fullFolderPath))
+                {
+                    var result = new CloudStorageResult
+                    {
+                        Status = Status.NotFound,
+                        Message = "Cannot find parent folder id: " + parentId
+                    };
+                    return (result, null);
+                }
+            }
+            else if (parentId != "/")
                 return (new CloudStorageResult { Message = "Wrong dropbox folder id format." }, null);
             
-            if (!parentId.EndsWith("/"))
-                parentId += "/";
-            return await CreateFolderAsync(parentId + folderName);
+            if (!fullFolderPath.EndsWith("/"))
+                fullFolderPath += "/";
+            fullFolderPath += folderName;
+            return await CreateFolderAsync(fullFolderPath);
         }
 
         private async Task<(CloudStorageResult result, string folderId)> CreateFolderAsync(string fullFolderPath)
@@ -210,6 +226,20 @@ namespace CloudStorages.DropBox
                 folderId = null;
             }
             return (result, folderId);
+        }
+
+        private async Task<string> TryGetFullPathAsync(string id)
+        {
+            try
+            {
+                var metadata = await dropboxClient.Files.GetMetadataAsync(id);
+                return metadata.PathLower;
+            }
+            catch (Exception ex)
+            {
+
+            }
+            return null;
         }
 
         private async Task<string> TryGetFolderIdAsync(string fullFolderPath)
