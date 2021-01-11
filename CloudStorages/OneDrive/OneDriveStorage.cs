@@ -9,10 +9,10 @@ using Microsoft.Graph;
 
 namespace CloudStorages.OneDrive
 {
-    public class OneDriveStorage : ICloudStorageClient
+    public class OneDriveStorage : ICloudStorageClient, IUriHandler
     {
         private const int CHUNK_SIZE = 1024 * 320;  // default size is 320kb
-        private readonly string ApiKey, ApiSecret;
+        private readonly string ApiKey, ApiSecret, RedirectUri;
         private OneDriveOauthClient oauthClient;
         private GraphServiceClient graphServiceClient;
         private IDriveRequestBuilder myDriveBuilder;
@@ -24,10 +24,11 @@ namespace CloudStorages.OneDrive
 
         public event EventHandler<CloudStorageProgressArgs> ProgressChanged;
 
-        public OneDriveStorage(string apiKey, string apiSecret = null)
+        public OneDriveStorage(string apiKey, string apiSecret = null, string redirectUri = null)
         {
             ApiKey = apiKey;
             ApiSecret = apiSecret;
+            RedirectUri = redirectUri;
         }
 
         public async Task<(CloudStorageResult result, string folderId)> CreateFolderAsync(string parentId, string folderName)
@@ -432,6 +433,37 @@ namespace CloudStorages.OneDrive
         private void OnProgressChanged(long bytesSent)
         {
             ProgressChanged?.Invoke(this, new CloudStorageProgressArgs {BytesSent = bytesSent});
+        }
+
+        public async Task<CloudStorageResult> AuthenticateFromUri(string state, string uri)
+        {
+            CloudStorageResult result = new CloudStorageResult();
+            try
+            {
+                bool success = await oauthClient.ProcessUriAsync(state, uri);
+                if (success)
+                {
+                    result.Status = Status.Success;
+                    SaveAccessTokenDelegate?.Invoke(oauthClient.AccessToken);
+                    SaveRefreshTokenDelegate?.Invoke(oauthClient.RefreshToken);
+                    InitDriveService();
+                }
+                else
+                    result.Status = Status.NeedAuthenticate;
+            }
+            catch (Exception e)
+            {
+                result.Message = e.Message;
+            }
+            return result;
+        }
+
+        public string LoginToUri()
+        {
+            StopListen();
+            oauthClient = new OneDriveOauthClient(ApiKey, null, RedirectUri);
+            string state = oauthClient.GetTokenToUri();
+            return state;
         }
     }
 }

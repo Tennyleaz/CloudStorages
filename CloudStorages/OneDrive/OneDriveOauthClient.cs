@@ -11,13 +11,13 @@ namespace CloudStorages.OneDrive
 {
     public class OneDriveOauthClient : IOauthClient
     {
-        private const string AuthorizationEndpoint = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id={0}&scope={1}&response_type=code&redirect_uri={2}";
+        private const string AuthorizationEndpoint = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id={0}&scope={1}&response_type=code&redirect_uri={2}&state={3}";
         private const string TokenRequestEndpoint = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
         //private const string TokenRevokeEndpoint = "https://oauth2.googleapis.com/revoke?token=";
         private const string SCOPE = "files.readwrite offline_access User.Read";
         private const string REDIRECT_URI = "http://localhost";
         private HttpListener listener;
-        private readonly string CLIENT_ID, CLIENT_SECRET;
+        private readonly string CLIENT_ID, CLIENT_SECRET, LOCAL_REDIRECT_URI;
 
         public string LastError { get; private set; }
 
@@ -31,10 +31,64 @@ namespace CloudStorages.OneDrive
         /// </summary>
         /// <param name="apiKey">Required client ID.</param>
         /// <param name="apiSecret">Public clients can't send a client secret.</param>
-        public OneDriveOauthClient(string apiKey, string apiSecret = null)
+        /// <param name="redirectUri">Custom redirect uri to open.</param>
+        public OneDriveOauthClient(string apiKey, string apiSecret = null, string redirectUri = null)
         {
             CLIENT_ID = apiKey;
             CLIENT_SECRET = apiSecret;
+            LOCAL_REDIRECT_URI = redirectUri;
+        }
+
+        /// <summary>
+        /// Open default browser to perform oauth login, will redirect to custom local uri.
+        /// </summary>
+        public string GetTokenToUri()
+        {
+            StopListen();
+
+            string state = Guid.NewGuid().ToString("N");
+
+            // Creates the OAuth 2.0 authorization request.
+            string authorizationRequest = string.Format(AuthorizationEndpoint,
+                CLIENT_ID,
+                SCOPE,
+                LOCAL_REDIRECT_URI, 
+                state);
+
+            // Opens request in the browser.
+            System.Diagnostics.Process.Start(authorizationRequest);
+            return state;
+        }
+
+        /// <summary>
+        /// Parse local redirect uri and extract tokens.
+        /// </summary>
+        public async Task<bool> ProcessUriAsync(string state, string uri)
+        {
+            uri = uri.Replace(LOCAL_REDIRECT_URI, string.Empty);
+            System.Collections.Specialized.NameValueCollection collection = System.Web.HttpUtility.ParseQueryString(uri);
+            // extracts the code
+            string code = collection.Get("code");
+            string incoming_state = collection.Get("state");
+            if (code == null || incoming_state == null)
+            {
+                return false;
+            }
+            // check state
+            if (!string.Equals(incoming_state, state))
+            {
+                return false;
+            }
+
+            // Exchanging code for token
+            OAuth2Response oAuth2Response = await PerformCodeExchangeAsync(code, LOCAL_REDIRECT_URI);
+            AccessToken = oAuth2Response.AccessToken;
+            RefreshToken = oAuth2Response.RefreshToken;
+            ExpiresAt = oAuth2Response.ExpiresAt;
+            if (!string.IsNullOrEmpty(AccessToken) && !string.IsNullOrEmpty(RefreshToken))
+                return true;
+
+            return true;
         }
 
         public async Task<bool> GetTokenAsync()
@@ -42,7 +96,7 @@ namespace CloudStorages.OneDrive
             StopListen();
 
             // Generates state and PKCE values.
-            //string state = Guid.NewGuid().ToString("N");
+            string state = Guid.NewGuid().ToString("N");
             //string codeVerifier = "";//GeneratePKCECodeVerifier();
 
             try
@@ -58,7 +112,8 @@ namespace CloudStorages.OneDrive
                 string authorizationRequest = string.Format(AuthorizationEndpoint,
                     CLIENT_ID,
                     SCOPE,
-                    redirectURI);
+                    redirectURI,
+                    state);
 
                 // Opens request in the browser.
                 System.Diagnostics.Process.Start(authorizationRequest);
@@ -101,7 +156,7 @@ namespace CloudStorages.OneDrive
                 }
                 // extracts the code
                 string code = context.Request.QueryString.Get("code");
-                /*string incoming_state = context.Request.QueryString.Get("state");
+                string incoming_state = context.Request.QueryString.Get("state");
                 if (code == null || incoming_state == null)
                 {
                     return false;
@@ -111,7 +166,7 @@ namespace CloudStorages.OneDrive
                 if (incoming_state != state)
                 {
                     return false;
-                }*/
+                }
 
                 // Starts the code exchange at the Token Endpoint.
                 OAuth2Response oAuth2Response = await PerformCodeExchangeAsync(code, redirectURI);

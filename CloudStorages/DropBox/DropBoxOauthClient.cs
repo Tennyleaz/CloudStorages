@@ -39,6 +39,9 @@ namespace CloudStorages.DropBox
             RedirectUri = new Uri(LoopbackHost);
         }
 
+        /// <summary>
+        /// Open default browser to perform oauth login, will redirect to custom local uri.
+        /// </summary>
         public string GetTokenToUri()
         {
             StopListen();
@@ -53,6 +56,9 @@ namespace CloudStorages.DropBox
             return state;
         }
 
+        /// <summary>
+        /// Parse local redirect uri and extract tokens.
+        /// </summary>
         public bool ProcessUri(string state, string uri)
         {
             NameValueCollection collection = System.Web.HttpUtility.ParseQueryString(uri);
@@ -61,7 +67,6 @@ namespace CloudStorages.DropBox
             string incoming_state = collection.Get("state");
             if (accessToken == null || incoming_state == null)
             {
-                //WSSystem.GetSystem().WriteLog("GoogleLoginInfo", WSBUtility.LOG_LEVEL.LL_SUB_FUNC, "Oauth request does not give code!");
                 return false;
             }
             // check state

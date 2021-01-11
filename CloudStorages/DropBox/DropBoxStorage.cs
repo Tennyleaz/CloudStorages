@@ -654,7 +654,7 @@ namespace CloudStorages.DropBox
             ProgressChanged?.Invoke(null, args);
         }
 
-        public CloudStorageResult AuthenticateFromUri(string state, string uri)
+        public async Task<CloudStorageResult> AuthenticateFromUri(string state, string uri)
         {
             CloudStorageResult result = new CloudStorageResult();
             try
@@ -669,7 +669,8 @@ namespace CloudStorages.DropBox
                     SaveRefreshTokenDelegate?.Invoke(LastRefreshToken);
                     InitDriveService();
                 }
-                result.Status = Status.NeedAuthenticate;
+                else
+                    result.Status = Status.NeedAuthenticate;
             }
             catch (Exception e)
             {

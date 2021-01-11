@@ -14,7 +14,7 @@ namespace CloudStorages
         /// <param name="state"></param>
         /// <param name="uri"></param>
         /// <returns></returns>
-        CloudStorageResult AuthenticateFromUri(string state, string uri);
+        Task<CloudStorageResult> AuthenticateFromUri(string state, string uri);
 
         /// <summary>
         /// OAuth login "token" flow through browser. Will not get additional results.
