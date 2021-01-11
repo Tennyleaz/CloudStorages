@@ -9,7 +9,7 @@ using Microsoft.Graph;
 
 namespace CloudStorages.OneDrive
 {
-    public class OneDriveStorage : ICloudStorageClient, IUriHandler
+    public class OneDriveStorage : IUriHandler
     {
         private const int CHUNK_SIZE = 1024 * 320;  // default size is 320kb
         private readonly string ApiKey, ApiSecret, RedirectUri;
@@ -260,6 +260,7 @@ namespace CloudStorages.OneDrive
                     if (needLogin)
                     {
                         lastRefreshToken = null;
+                        result.Message = oauthClient.LastError;
                     }
                     else
                     {

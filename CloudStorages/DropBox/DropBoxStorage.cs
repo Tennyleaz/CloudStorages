@@ -9,7 +9,7 @@ using Dropbox.Api.Files;
 
 namespace CloudStorages.DropBox
 {
-    public class DropBoxStorage : ICloudStorageClient, IUriHandler
+    public class DropBoxStorage : IUriHandler
     {
         //private const string DateTimeFormat = "yyyy-MM-dd HHmmss";
         private const int CHUNK_SIZE = 1024 * 100;  // default size is 100kb

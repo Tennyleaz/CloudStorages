@@ -301,6 +301,18 @@ namespace CloudStorages.OneDrive
                     }
                 }
             }
+            catch (WebException ex)
+            {
+                if (ex.Response is HttpWebResponse response)
+                {
+                    using (StreamReader reader = new StreamReader(response.GetResponseStream()))
+                    {
+                        // reads response body
+                        string responseText = await reader.ReadToEndAsync();
+                        LastError = responseText;
+                    }
+                }
+            }
             catch (Exception ex)
             {
                 LastError = ex.Message;

@@ -6,7 +6,10 @@ using System.Threading.Tasks;
 
 namespace CloudStorages
 {
-    public interface IUriHandler
+    /// <summary>
+    /// The cloud storage client which could also handle uri redirect.
+    /// </summary>
+    public interface IUriHandler : ICloudStorageClient
     {
         /// <summary>
         /// Extract access token from redirect uri, and init dropbox client when authentication success.
