@@ -1,0 +1,69 @@
+﻿<Window x:Class="WpfSample.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:WpfSample"
+        mc:Ignorable="d"
+        WindowStartupLocation="CenterScreen"
+        Loaded="MainWindow_OnLoaded" Closing="MainWindow_OnClosing"
+        Title="MainWindow" Height="450" Width="800">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+            <ColumnDefinition Width="200"/>
+        </Grid.ColumnDefinitions>
+
+        <DockPanel Grid.Column="0" LastChildFill="True">
+            <Grid DockPanel.Dock="Top">
+                <Label Name="lbUserName" FontSize="16" Content="User Name"/>
+                <Label Name="lbUserEmail" Content="User Email" Margin="0,20,0,0"/>
+                <Label Name="lbUsage" Content="Usage: 0/0" Margin="0,20,0,0" HorizontalAlignment="Right"/>
+                <ProgressBar Name="progressUsage" Height="4" Margin="4,44,4,4"/>
+            </Grid>
+            <TextBox Name="tbLog" Height="80" DockPanel.Dock="Bottom" IsReadOnly="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"/>
+            <TreeView Name="treeView" Background="#FFF1F1F1" TreeViewItem.Expanded="TreeView_OnExpanded">
+                <TreeView.Resources>
+                    <HierarchicalDataTemplate DataType="{x:Type local:FileVM}" ItemsSource="{Binding Members}">
+                        <DockPanel LastChildFill="True" Width="500">
+                            <Label Width="80" Content="{Binding Size}" DockPanel.Dock="Right"/>
+                            <Label Width="160" Content="{Binding ModifiedTime}" DockPanel.Dock="Right"/>
+                            <Label Content="{Binding Name}" DockPanel.Dock="Left"/>
+                        </DockPanel>
+                    </HierarchicalDataTemplate>
+                </TreeView.Resources>
+                <TreeView.ItemContainerStyle>
+                    <Style>
+                        <Setter Property="TreeViewItem.IsExpanded" Value="{Binding IsExpand, Mode=TwoWay}"/>
+                    </Style>
+                </TreeView.ItemContainerStyle>
+            </TreeView>
+        </DockPanel>
+
+        <StackPanel Grid.Column="1" Name="buttonPanel">
+            <ComboBox Name="comboCloud" Margin="4" Height="24" IsEnabled="{Binding ElementName=btnLogin, Path=IsEnabled}" VerticalContentAlignment="Center">
+                <ComboBoxItem>Dropbox</ComboBoxItem>
+                <ComboBoxItem>Onedrive</ComboBoxItem>
+            </ComboBox>
+            <Button Name="btnLogin" Margin="4" Height="24" Click="BtnLogin_OnClick">Login</Button>
+            <Button Name="btnLogout" Margin="4" Height="24" Click="BtnLogout_OnClick" IsEnabled="False">Logout</Button>
+            <Button Name="btnList" Margin="4" Height="24" Click="BtnList_OnClick" IsEnabled="{Binding ElementName=btnLogout, Path=IsEnabled}">List My Cloud Storage</Button>
+            <Button Name="btnDownload" Margin="4" Height="24" Click="BtnDownload_OnClick" IsEnabled="{Binding ElementName=btnLogout, Path=IsEnabled}">Download Selected</Button>
+            <Button Name="btnDelete" Margin="4" Height="24" Click="BtnDelete_OnClick" IsEnabled="{Binding ElementName=btnLogout, Path=IsEnabled}">Delete Selected</Button>
+            <Button Name="btnCreate" Margin="4" Height="24" Click="BtnCreate_OnClick"  IsEnabled="{Binding ElementName=btnLogout, Path=IsEnabled}">Create Folder</Button>
+            <Button Name="btnUpload" Margin="4" Height="24" Click="BtnUpload_OnClick" IsEnabled="{Binding ElementName=btnLogout, Path=IsEnabled}">Upload File...</Button>
+            <Button Name="btnRegisterUri" Margin="4" Height="24" Click="BtnRegisterUri_OnClick">
+                <StackPanel Orientation="Horizontal">
+                    <Image Name="shieldImage1" Stretch="Uniform"/>
+                    <Label Content="Register URI" Padding="0" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+            <Button Name="btnUnRegisterUri" Margin="4" Height="24" Click="BtnUnRegisterUri_OnClick">
+                <StackPanel Orientation="Horizontal">
+                    <Image Name="shieldImage2" Stretch="Uniform"/>
+                    <Label Content="Unregister URI" Padding="0" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+        </StackPanel>
+    </Grid>
+</Window>
