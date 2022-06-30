@@ -11,7 +11,7 @@ namespace CloudStorages.OneDrive
 {
     public class OneDriveStorage : IUriHandler
     {
-        private const int CHUNK_SIZE = 1024 * 320;  // default size is 320kb
+        private const int CHUNK_SIZE = 1024 * 1024;  // default size is 1MB
         private readonly string ApiKey, ApiSecret, RedirectUri;
         private OneDriveOauthClient oauthClient;
         private GraphServiceClient graphServiceClient;

@@ -16,7 +16,7 @@ namespace CloudStorages.GoogleDrive
     {
         private const string UerInfoEndpoint = "https://www.googleapis.com/userinfo/v2/me?oauth_token=";
         private const string FOLDER_TYPE = "application/vnd.google-apps.folder";
-        private const int CHUNK_SIZE = Google.Apis.Upload.ResumableUpload.MinimumChunkSize * 2;  // default is 512KB
+        private const int CHUNK_SIZE = Google.Apis.Upload.ResumableUpload.MinimumChunkSize * 4;  // default is 256kb x 4 = 1MB
         private readonly string ApiKey, ApiSecret, AppName;
         private GoogleDriveOauthClient oauthClient;
         private DriveService driveService;

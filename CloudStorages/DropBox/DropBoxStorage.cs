@@ -12,7 +12,7 @@ namespace CloudStorages.DropBox
     public class DropBoxStorage : IUriHandler
     {
         //private const string DateTimeFormat = "yyyy-MM-dd HHmmss";
-        private const int CHUNK_SIZE = 1024 * 100;  // default size is 100kb
+        private const int CHUNK_SIZE = 1024 * 1024;  // default size is 1MB
         private string LastRefreshToken = null;
         private string LastAccessToken = null;
         private DropBoxOauthClient oAuthWrapper;
