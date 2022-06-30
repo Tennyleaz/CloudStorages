@@ -9,9 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Dropbox.Api" Version="6.0.1" />
-    <PackageReference Include="Google.Apis.Drive.v3" Version="1.49.0.2194" />
-    <PackageReference Include="Microsoft.Graph" Version="3.21.0" />
+    <PackageReference Include="Dropbox.Api" Version="6.31.0" />
+    <PackageReference Include="Google.Apis.Drive.v3" Version="1.57.0.2684" />
+    <PackageReference Include="Microsoft.Graph" Version="4.33.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
 

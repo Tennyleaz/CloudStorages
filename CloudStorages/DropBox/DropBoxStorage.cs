@@ -622,12 +622,13 @@ namespace CloudStorages.DropBox
                     parentFolder += "/";
                 parentFolder += Path.GetFileName(filePath);
                 CommitInfo info = new CommitInfo(parentFolder, autorename: true);
+                UploadSessionFinishArg finishArg = new UploadSessionFinishArg(endCursor, info);
 
                 // do last session
                 FileMetadata finishResult;
                 using (MemoryStream tempStream = new MemoryStream(buffer, 0, length, false))
                 {
-                    finishResult = await dropboxClient.Files.UploadSessionFinishAsync(endCursor, info, tempStream);
+                    finishResult = await dropboxClient.Files.UploadSessionFinishAsync(finishArg, tempStream);
                     Console.WriteLine("Finished large file: " + finishResult.PathDisplay);
                 }
 
