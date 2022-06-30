@@ -227,7 +227,7 @@ namespace CloudStorages.OneDrive
                     string[] scopeList = null;
                     if (tokenEndpointDecoded.ContainsKey("scope"))
                     {
-                        scopeList = tokenEndpointDecoded["expires_in"].Split(' ');
+                        scopeList = tokenEndpointDecoded["scope"].Split(' ');
                     }
                     return new OAuth2Response(access_token, refresh_token, scopeList, "bearer", expiresIn);
                 }
