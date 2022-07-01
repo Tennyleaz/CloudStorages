@@ -11,8 +11,9 @@ namespace CloudStorages.Box
 {
     public class BoxOauthClient : IOauthClient
     {
-        private const string AutherizeEndpoint = "https://account.box.com/api/oauth2/authorize";
-        private const string TokenRequestEndpoint = "https://api.box.com/oauth2/token";        
+        private const string AuthorizeEndpoint = "https://account.box.com/api/oauth2/authorize";
+        private const string TokenRequestEndpoint = "https://api.box.com/oauth2/token";      
+        private const string TokenRevokeEndpoint = "https://api.box.com/oauth2/revoke";
         private readonly string apiKey, apiSecret;
         private HttpListener listener;
 
@@ -120,14 +121,109 @@ namespace CloudStorages.Box
             return false;
         }
 
-        public Task<bool> RefreshTokenAsync(string refreshToken)
+        public async Task<bool> RefreshTokenAsync(string refreshToken)
         {
-            throw new NotImplementedException();
+            WebRequest request = WebRequest.Create(TokenRequestEndpoint);
+            request.Method = "POST";
+            request.ContentType = "application/x-www-form-urlencoded";
+            //request.Headers.Add(HttpRequestHeader.AcceptLanguage, "application/json;charset=UTF-8");
+
+            // fill post request form data
+            string data = $"client_id={apiKey}&client_secret={apiSecret}&refresh_token={refreshToken}&grant_type=refresh_token";
+            using (StreamWriter requestWriter = new StreamWriter(await request.GetRequestStreamAsync()))
+            {
+                requestWriter.Write(data, 0, data.Length);
+                requestWriter.Close();
+            }
+
+            try
+            {
+                using (WebResponse response = await request.GetResponseAsync())
+                {
+                    using (StreamReader streamReader = new StreamReader(response.GetResponseStream()))
+                    {
+                        string streamtoStr = await streamReader.ReadToEndAsync();
+                        Newtonsoft.Json.Linq.JObject jObject = Newtonsoft.Json.Linq.JObject.Parse(streamtoStr);
+                        string accessToken = jObject["access_token"]?.ToString();
+                        refreshToken = jObject["refresh_token"]?.ToString() ?? refreshToken;
+                        if (jObject["expires_in"] != null)
+                            ExpiresAt = DateTime.Now.AddSeconds(jObject["expires_in"].ToObject<int>());
+                        else
+                            ExpiresAt = null;
+                        if (!string.IsNullOrEmpty(accessToken))
+                        {
+                            AccessToken = accessToken;
+                            RefreshToken = refreshToken;
+                            return true;
+                        }
+                    }
+                }
+            }
+            catch (WebException ex)
+            {
+                if (ex.Status == WebExceptionStatus.ProtocolError)
+                {
+                    if (ex.Response is HttpWebResponse response)
+                    {
+                        using (StreamReader reader = new StreamReader(response.GetResponseStream()))
+                        {
+                            // reads response body
+                            string responseText = await reader.ReadToEndAsync();
+                            LastError = responseText;                            
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LastError = ex.Message;
+            }
+            return false;
         }
 
-        public Task<bool> RevokeTokenAsync(string accessToken)
+        public async Task<bool> RevokeTokenAsync(string accessToken)
         {
-            throw new NotImplementedException();
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(TokenRevokeEndpoint);
+            request.Method = "POST";
+            request.ContentType = "application/x-www-form-urlencoded";
+
+            // fill post request form data
+            string data = $"client_id={apiKey}&client_secret={apiSecret}&access_token={accessToken}";
+            using (StreamWriter requestWriter = new StreamWriter(await request.GetRequestStreamAsync()))
+            {
+                requestWriter.Write(data, 0, data.Length);
+                requestWriter.Close();
+            }
+
+            try
+            {
+                using (HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync())
+                {
+                    // Returns an empty response when the token was successfully revoked.
+                    if (response.StatusCode == HttpStatusCode.OK)
+                        return true;                    
+                }
+            }
+            catch (WebException ex)
+            {
+                if (ex.Status == WebExceptionStatus.ProtocolError)
+                {
+                    if (ex.Response is HttpWebResponse response)
+                    {
+                        using (StreamReader reader = new StreamReader(response.GetResponseStream()))
+                        {
+                            // reads response body
+                            string responseText = await reader.ReadToEndAsync();
+                            LastError = responseText;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LastError = ex.Message;
+            }
+            return false;
         }
 
         public void StopListen()
@@ -217,7 +313,7 @@ namespace CloudStorages.Box
             if (string.IsNullOrEmpty(clientId))
                 throw new ArgumentNullException(nameof(clientId));
 
-            string strUri = AutherizeEndpoint + $"?response_type=code&client_id={clientId}&redirect_uri={redirectUrl}";
+            string strUri = AuthorizeEndpoint + $"?response_type=code&client_id={clientId}&redirect_uri={redirectUrl}";
             if (!string.IsNullOrEmpty(state))
                 strUri += $"&state={state}";
 
